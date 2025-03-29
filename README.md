@@ -5,16 +5,55 @@
 Zhaoyi "Nitan" Li (2nd year PhD in Physics)\
 Takuya Isogawa (3rd year PhD in Nuclear Science)\
 Honghao Fu (Faculty @ Concordia)\
+Caio Silva (junior in Physics)\
 **Supervisor** Ike Chuang
 ### Meetings
 Weekly meetings (TBD) to catch up on progress
 Notion page:
 (TBA)
 
+## Conda Environment: Step-by-Step Setup
+
+You can set up your environment directly using the `environment.yml` file already included in the repo.
+
+**Create and activate the environment from the YAML file**
+   ```bash
+   conda env create -f environment.yml
+   conda activate qpa_env
+   ```
+
+### Jupyter Notebook Setup
+
+If Jupyter isn't already installed in the environment, you can add it with:
+```bash
+conda install jupyter notebook
+```
+
+To use your environment as a Jupyter kernel:
+```bash
+python -m ipykernel install --user --name=qpa_env --display-name "QPA Env"
+```
+
+Then you can launch notebooks with:
+```bash
+jupyter notebook
+```
+
+## API Token Setup
+
+If you're using IBM Quantum services, create a `.env` file in the root of the project directory with the following line:
+
+```env
+IBM_QUANTUM_TOKEN=your_ibmq_token_here
+```
+
+
+
+
 ## Project Goal
 QEC is great (theoretically), but the resource budget is jaw dropping. We want to develop alternative method to gated-based QEC more applicable to NISQ applications that can actually make a difference.
 
- ## Current Directions
+## Current Directions
 
 ### 1. OQPA (Optimal Quantum Purity Amplification), previously known as Quantum state purification
  QPA is a class of quantum protocol that increases the purity of quantum states by consuming copies of noisy states, and OQPA is the info theoretic optimal construction under certain FOM. This question has been studied by many for the past 20 years, but the only solved instance is for qubits. In April 2024 we have solved the problem for $n\to 1$ OQPAs for *qudits* and developed an explicit construction for it. Now we are aiming to find more practical applications of the scheme. (Work to be published)

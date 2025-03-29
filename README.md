@@ -39,6 +39,15 @@ Then you can launch notebooks with:
 jupyter notebook
 ```
 
+## API Token Setup
+
+If you're using IBM Quantum services, create a `.env` file in the root of the project directory with the following line:
+
+```env
+IBM_QUANTUM_TOKEN=your_ibmq_token_here
+```
+
+
 
 
 ## Project Goal

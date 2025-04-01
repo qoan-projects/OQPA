@@ -48,26 +48,23 @@ If you're using IBM Quantum services, create a `.env` file in the root of the pr
 IBM_QUANTUM_TOKEN=your_ibmq_token_here
 ```
 
-Yes! That's an important extra step — here's the updated paragraph with those environment variables added explicitly to resolve the `Python.h` issue during CMake configuration:
-
----
 
 ## GPU-Accelerated Qiskit Aer Setup on SubMIT
 
-To enable GPU acceleration for `qiskit-aer` on the SubMIT cluster, first follow the [SubMIT GPU access guide](https://submit.mit.edu) and request an interactive GPU node via Slurm:
+To enable GPU acceleration for `qiskit-aer` on the SubMIT cluster, start by installing the GPU-enabled version:
+
+```bash
+pip install qiskit-aer-cu11
+```
+
+Then, follow the [SubMIT GPU access guide](https://submit.mit.edu) to request an interactive GPU node via Slurm:
 
 ```bash
 salloc --partition=submit-gpu-a30 --cpus-per-gpu=1 --gres=gpu:1 --mem=8G --time=01:00:00
 ```
 
-Once you're inside the GPU node (e.g., `submit20`), make sure CUDA is available:
+Once you're on the GPU node (e.g., `submit20`), you need to manually add CUDA to your environment:
 
-
-```bash
-nvcc --version
-```
-
-If this returns an error saying `nvcc` is not found, you likely need to manually add CUDA to your environment. You can do this by exporting the necessary paths:
 
 ```bash
 export CUDA_ROOT=/usr/local/cuda
@@ -75,68 +72,22 @@ export PATH=$CUDA_ROOT/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_ROOT/lib64:$LD_LIBRARY_PATH
 ```
 
-After exporting, confirm again:
+Then check:
 
 ```bash
 nvcc --version
 ```
 
-It should now report the correct version (e.g., CUDA 12.4).
-
-Then clone and configure Aer with CUDA support:
+Finally, confirm that Qiskit Aer recognizes your GPU:
 
 ```bash
-git clone https://github.com/Qiskit/qiskit-aer.git
-cd qiskit-aer
-mkdir build && cd build
+python -c "from qiskit_aer import AerSimulator; print(AerSimulator().available_devices())"
 ```
 
-If you hit a **Conan missing** error, install Conan 1.x (Aer is not yet compatible with Conan 2.x):
-
-```bash
-pip install "conan<2.0"
-```
-
-If the build fails with:
+You should see:
 
 ```
-fatal error: Python.h: No such file or directory
-```
-
-you’ll need to point CMake to your Python headers and library manually. Set the environment variables like this:
-
-```bash
-export PYTHON_INCLUDE_DIR=$CONDA_PREFIX/include/python3.11
-export PYTHON_LIBRARY=$CONDA_PREFIX/lib/libpython3.11.so
-```
-
-Then run the CMake configuration again:
-
-```bash
-cmake .. -DAER_THRUST_BACKEND=CUDA \
-         -DCMAKE_CUDA_COMPILER=$(which nvcc) \
-         -DPYTHON_INCLUDE_DIR=$PYTHON_INCLUDE_DIR \
-         -DPYTHON_LIBRARY=$PYTHON_LIBRARY
-```
-
-Once that finishes:
-
-```bash
-make -j$(nproc)
-pip install -e ..
-```
-
-If pybind11 is not working, use 
-
-```bash
-export CPLUS_INCLUDE_PATH=/work/submit/ladmon/miniforge3/envs/myenv/lib/python3.11/site-packages/pybind11/include
-```
-
-To verify that the GPU backend is enabled:
-
-```bash
-python -c "from qiskit_aer import AerSimulator; print(AerSimulator().configuration().device)"
-# Should print: 'GPU'
+('CPU', 'GPU')
 ```
 
 

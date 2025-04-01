@@ -1,0 +1,85 @@
+archspec @ file:///home/conda/feedstock_root/build_artifacts/archspec_1737352602016/work
+boltons @ file:///home/conda/feedstock_root/build_artifacts/boltons_1733827268945/work
+bottle==0.12.25
+Brotli @ file:///home/conda/feedstock_root/build_artifacts/brotli-split_1725267488082/work
+certifi @ file:///home/conda/feedstock_root/build_artifacts/certifi_1739515848642/work/certifi
+cffi @ file:///home/conda/feedstock_root/build_artifacts/cffi_1725560558132/work
+charset-normalizer @ file:///home/conda/feedstock_root/build_artifacts/charset-normalizer_1735929714516/work
+colorama @ file:///home/conda/feedstock_root/build_artifacts/colorama_1733218098505/work
+conan==1.66.0
+conda @ file:///home/conda/feedstock_root/build_artifacts/conda_1736947900115/work
+conda-libmamba-solver @ file:///home/conda/feedstock_root/build_artifacts/conda-libmamba-solver_1727359833193/work/src
+conda-package-handling @ file:///home/conda/feedstock_root/build_artifacts/conda-package-handling_1736345463896/work
+conda_package_streaming @ file:///home/conda/feedstock_root/build_artifacts/conda-package-streaming_1741620732069/work
+cudensitymat-cu12==0.1.0
+cuquantum-cu11==24.8.0
+cuquantum-cu12==25.3.0
+custatevec-cu11==1.6.0.post1
+custatevec-cu12==1.8.0
+cutensor-cu11==2.2.0
+cutensor-cu12==2.2.0
+cutensornet-cu11==2.5.0
+cutensornet-cu12==2.7.0
+dill==0.3.9
+distro==1.8.0
+fasteners==0.19
+frozendict @ file:///home/conda/feedstock_root/build_artifacts/frozendict_1728841327252/work
+h2 @ file:///home/conda/feedstock_root/build_artifacts/h2_1738578511449/work
+hpack @ file:///home/conda/feedstock_root/build_artifacts/hpack_1737618293087/work
+hyperframe @ file:///home/conda/feedstock_root/build_artifacts/hyperframe_1737618333194/work
+idna @ file:///home/conda/feedstock_root/build_artifacts/idna_1733211830134/work
+Jinja2==3.1.6
+jsonpatch @ file:///home/conda/feedstock_root/build_artifacts/jsonpatch_1733814567314/work
+jsonpointer @ file:///home/conda/feedstock_root/build_artifacts/jsonpointer_1725302935093/work
+libmambapy @ file:///home/conda/feedstock_root/build_artifacts/mamba-split_1735835715095/work/libmambapy
+mamba @ file:///home/conda/feedstock_root/build_artifacts/mamba-split_1735835715095/work/mamba
+MarkupSafe==3.0.2
+menuinst @ file:///home/conda/feedstock_root/build_artifacts/menuinst_1731146972698/work
+mpmath==1.3.0
+node-semver==0.6.1
+numpy==2.2.4
+nvidia-cublas-cu11==11.11.3.6
+nvidia-cublas-cu12==12.8.4.1
+nvidia-cuda-runtime-cu11==11.8.89
+nvidia-cuda-runtime-cu12==12.8.90
+nvidia-cusolver-cu11==11.4.1.48
+nvidia-cusolver-cu12==11.7.3.90
+nvidia-cusparse-cu11==11.7.5.86
+nvidia-cusparse-cu12==12.5.8.93
+nvidia-nvjitlink-cu12==12.8.93
+packaging @ file:///home/conda/feedstock_root/build_artifacts/packaging_1733203243479/work
+pandas==2.2.3
+patch-ng==1.17.4
+pbr==6.1.1
+platformdirs @ file:///home/conda/feedstock_root/build_artifacts/platformdirs_1733232627818/work
+pluggy @ file:///home/conda/feedstock_root/build_artifacts/pluggy_1733222765875/work
+pluginbase==1.0.1
+psutil==7.0.0
+pycosat @ file:///home/conda/feedstock_root/build_artifacts/pycosat_1732588402431/work
+pycparser @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_pycparser_1733195786/work
+Pygments==2.19.1
+PyJWT==2.10.1
+PySocks @ file:///home/conda/feedstock_root/build_artifacts/pysocks_1733217236728/work
+python-dateutil==2.9.0.post0
+pytz==2025.2
+PyYAML==6.0.2
+qiskit==2.0.0
+qiskit-aer-gpu-cu11==0.17.0
+requests @ file:///home/conda/feedstock_root/build_artifacts/requests_1733217035951/work
+ruamel.yaml @ file:///home/conda/feedstock_root/build_artifacts/ruamel.yaml_1736248036158/work
+ruamel.yaml.clib @ file:///home/conda/feedstock_root/build_artifacts/ruamel.yaml.clib_1728724466132/work
+rustworkx==0.16.0
+scipy==1.15.2
+setuptools==75.8.2
+six==1.16.0
+stevedore==5.4.1
+symengine==0.13.0
+sympy==1.13.3
+tqdm @ file:///home/conda/feedstock_root/build_artifacts/tqdm_1735661334605/work
+truststore @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_truststore_1739009763/work
+typing_extensions==4.13.0
+tzdata==2025.2
+urllib3==1.26.20
+vector==1.6.1
+wheel==0.45.1
+zstandard==0.23.0

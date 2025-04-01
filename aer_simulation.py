@@ -51,7 +51,7 @@ def get_QPA_circuit(d, epsilon, N):
     return qc
 
 def run_circuit(qc, shots):
-    sim = AerSimulator(method='statevector_gpu')
+    sim = AerSimulator(method='statevector')
     transpiled = transpile(qc, sim)
     result = sim.run(transpiled, shots=shots, memory=True).result()
     return result.get_memory()

@@ -8,9 +8,6 @@
 #SBATCH --output=logs/qpa_sim_d4_s10240_%j.out
 #SBATCH --error=logs/qpa_sim_d4_s10240_%j.err
 
-# Activate environment
-source ~/miniforge3/bin/activate base
-
 # CUDA setup (optional)
 export CUDA_ROOT=/usr/local/cuda
 export PATH=$CUDA_ROOT/bin:$PATH

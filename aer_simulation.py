@@ -63,6 +63,7 @@ def main():
     parser.add_argument('--lambda-min', type=float, default=0.0)
     parser.add_argument('--lambda-max', type=float, default=1.0)
     parser.add_argument('--lambda-steps', type=int, default=20)
+    parser.add_argument('--lambda-index', type=int, default=None)
     parser.add_argument('--nqpa', type=int, default=1)
     parser.add_argument('--output', type=str, default='data/fidelity_output.csv')
     args = parser.parse_args()
@@ -70,6 +71,8 @@ def main():
     d = args.d
     shots = args.shots
     lambdas = np.linspace(args.lambda_min, args.lambda_max, args.lambda_steps)
+    if args.lambda_index is not None:
+        lambdas = [lambdas[args.lambda_index]]
     nqpa = args.nqpa
 
     fidelities = []

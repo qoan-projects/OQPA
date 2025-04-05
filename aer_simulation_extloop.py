@@ -48,15 +48,23 @@ def get_QPA_circuit(k, epsilon, N):
         qc = recursive(N, qc)
     for i in range(k):
         qc.measure(3*k + i, cr[i])
+    qc.save_statevector() # for debugging
     return qc
 
-def run_circuit(qc, shots):
-    # sim = AerSimulator(method='statevector', device='GPU')
-    sim = AerSimulator(method='automatic')
-    #, device='GPU'
+def run_circuit_explicit(qc, k, num_shots):
+    sim = AerSimulator(method='automatic', device='GPU')
     transpiled = transpile(qc, sim)
-    result = sim.run(transpiled, shots=shots, memory=True).result()
-    return result.get_memory()
+
+    count_zeros = 0
+    for _ in range(num_shots):
+        result = sim.run(transpiled, memory=True).result()
+        state = result.get_statevector()
+        # print(state)
+        # memory = result.get_memory()
+        # final_measurement = memory[0]  # single-shot result
+        # if final_measurement.endswith('0' * k):
+        #     count_zeros += 1
+    return count_zeros / num_shots
 
 def main():
     parser = argparse.ArgumentParser(
@@ -92,8 +100,7 @@ def main():
     for lam in tqdm(lambdas, desc="Sweeping over λ", unit="λ"):
         with tqdm(total=1, desc=f"λ={lam:.3f}", leave=False) as pbar:
             qc = get_QPA_circuit(k, lam, nqpa)
-            memory = run_circuit(qc, shots)
-            fid = memory.count('0' * k) / len(memory)
+            fid = run_circuit_explicit(qc, k, shots)
             fidelities.append(fid)
             pbar.update(1)
 

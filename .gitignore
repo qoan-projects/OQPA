@@ -3,3 +3,4 @@ data/
 .DS_Store
 .env
 reqs/Miniconda3-latest-MacOSX-x86_64.sh
+__pycache__

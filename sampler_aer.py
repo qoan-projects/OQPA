@@ -100,49 +100,73 @@ def estimate_qc_and_return_distribution(qc, observables, estimator):
     return result[0].data.evs
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--d', type=int, default=3)
-    parser.add_argument('--shots', type=int, default=4096)
-    parser.add_argument('--lambda-min', type=float, default=0.0)
-    parser.add_argument('--lambda-max', type=float, default=0.009)
-    parser.add_argument('--lambda-steps', type=int, default=10)
-    parser.add_argument('--nqpa', nargs='+', type=int, default=[0,1,2])
-    parser.add_argument('--output', type=str, default='data/fidelity_vs_lambda.csv')
-    args = parser.parse_args()
+    parser = argparse.ArgumentParser(
+        description="Run the QPA-ising circuit simulation and evaluate fidelity vs noise strength (λ)."
+    )
 
+    parser.add_argument('--d', type=int, default=3, metavar='NQUBITS',
+                        help='Number of qubits per register (default: 3)')
+    parser.add_argument('--shots', type=int, default=4096, metavar='SHOTS',
+                        help='Number of shots per circuit execution (default: 4096)')
+    parser.add_argument('--epsilon-min', type=float, default=0.0, metavar='epsilon_MIN',
+                        help='Minimum λ (noise strength) value to sweep (default: 0.0)')
+    parser.add_argument('--epsilon-max', type=float, default=0.009, metavar='epsilon_MAX',
+                        help='Maximum λ value to sweep (default: 0.009)')
+    parser.add_argument('--epsilon-steps', type=int, default=10, metavar='NSTEPS',
+                        help='Number of steps between λ_min and λ_max (default: 10)')
+    parser.add_argument('--nqpa', type=int, default=1, metavar='NQPA',
+                    help='Number of QPA rounds to apply (default: 1)')
+    parser.add_argument('--output', type=str, default='data/fidelity_vs_epsilon.csv', metavar='OUTPUT',
+                        help='Path to output CSV file (default: data/fidelity_vs_epsilon.csv)')
+    args = parser.parse_args()
     t, J, h, steps = 5.0, 1, 1, 5
     d = args.d
     shots = args.shots
-    list_of_noise = np.linspace(args.lambda_min, args.lambda_max, args.lambda_steps)
-    list_of_Nqpa = args.nqpa
+    list_of_noise = np.linspace(args.epsilon_min, args.epsilon_max, args.epsilon_steps)
+    Nqpa = args.nqpa
 
     ising = ising_class(d, steps, t, J, h)
     trotterized_state = ising.get_trotterized_ising_statevector()
 
     projector_q3 = SparsePauliOp.from_operator(trotterized_state.to_operator())
     identity_op = SparsePauliOp(["I" * d])
-    full_projector = projector_q3.tensor(identity_op).tensor(identity_op).tensor(identity_op)
+    pauli_str = "XYZIXZZIYXYZ"
+    full_projector = SparsePauliOp.from_list([(pauli_str, 1)])
+    # full_projector = projector_q3.tensor(identity_op).tensor(identity_op).tensor(identity_op)
+    # full_projector = identity_op.tensor(identity_op).tensor(identity_op).tensor(identity_op)
 
-    purified_fidelity = {i: [] for i in list_of_Nqpa}
+    # very simple full_projector for debugging, but very slow
+    # zero_state = Statevector.from_label("0" * d * 4)
+    # full_projector = SparsePauliOp.from_operator(zero_state.to_operator())
+    purified_fidelity = []
     pass_manager = generate_preset_pass_manager(3, AerSimulator())
 
     for noise in tqdm(list_of_noise, desc="Sweeping over λ", unit="λ"):
+        t0 = time.perf_counter()
         noise_model = NoiseModel()
         noise_model.add_all_qubit_quantum_error(depolarizing_error(noise, 1), ['h', 'x', 'rx', 'rz'])
         noise_model.add_all_qubit_quantum_error(depolarizing_error(noise, 2), ['cx'])
-        estimator = AerEstimator(options=dict(backend_options=dict(noise_model=noise_model, shots=shots)))
+        estimator = AerEstimator(options=dict(backend_options=dict(noise_model=noise_model, shots=shots, method='automatic', device='GPU')))
+        #, device = 'GPU'
+        
+        QPA = get_QPA_circuit(d, Nqpa, ising)
+        isa_circuit = pass_manager.run(QPA)
+        qc_transpiled = transpile(isa_circuit)
 
-        for Nqpa in list_of_Nqpa:
-            QPA = get_QPA_circuit(d, Nqpa, ising)
-            isa_circuit = pass_manager.run(QPA)
-            qc_transpiled = transpile(isa_circuit)
-            result = estimator.run([(qc_transpiled, full_projector, None)]).result()
-            fidelity = result[0].data.evs
-            purified_fidelity[Nqpa].append(fidelity)
+        t1 = time.perf_counter()
+        result = estimator.run([(qc_transpiled, full_projector, None)]).result()
+        t2 = time.perf_counter()
+        fidelity = result[0].data.evs
+        purified_fidelity.append(fidelity)
+        
+        print(f"Delta t1: {t1 - t0:.3f} sec", flush=True)
+        print(f"Delta t2: {t2 - t1:.3f} sec", flush=True)
 
     os.makedirs("data", exist_ok=True)
-    df = pd.DataFrame({f'Nqpa={k}': purified_fidelity[k] for k in list_of_Nqpa})
-    df.insert(0, "Lambda", list(list_of_noise))
+    df = pd.DataFrame({
+    'epsilon': list(list_of_noise),
+    f'QPA_{args.nqpa}': purified_fidelity
+    })
     df.to_csv(args.output, index=False)
     print(f'[+] Output saved to {args.output}')
 

@@ -4,3 +4,4 @@ data/
 .env
 reqs/Miniconda3-latest-MacOSX-x86_64.sh
 __pycache__
+.vscode/

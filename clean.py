@@ -1,20 +1,57 @@
 import pandas as pd
 import glob
 import os
+import re
+import argparse
 
-# Define path to your results (update if needed)
-outdir = "data/d5_shots102400_nqpa2"
-pattern = os.path.join(outdir, "fidelity_lambda0.0-1.0_steps40_lam*.csv")
+def main():
+    parser = argparse.ArgumentParser(description="Combine individual fidelity result files into a single CSV.")
+    parser.add_argument('--outdir', type=str, required=True, help='Directory containing fidelity result files.')
+    args = parser.parse_args()
 
-# Get all matching files and sort by lambda index
-files = sorted(glob.glob(pattern), key=lambda x: int(x.split("lam")[-1].split(".csv")[0]))
+    outdir = args.outdir
 
-# Read each file and combine into one DataFrame
-dfs = [pd.read_csv(f) for f in files]
-combined = pd.concat(dfs, ignore_index=True)
+    # Match both epsilon and lambda files
+    pattern = os.path.join(outdir, "fidelity_*_eps*.csv")
+    files = glob.glob(pattern)
+    if not files:
+        pattern = os.path.join(outdir, "fidelity_*_lam*.csv")
+        files = glob.glob(pattern)
+    if not files:
+        raise RuntimeError("No matching files found for either epsilon or lambda.")
 
-# Save to combined output
-combined_path = os.path.join(outdir, "fidelity_combined.csv")
-combined.to_csv(combined_path, index=False)
+    # Determine whether it's epsilon or lambda from first file
+    basename = os.path.basename(files[0])
+    match = re.search(r'(epsilon|lambda)([\d.]+)-([\d.]+)_steps(\d+)', basename)
+    if not match:
+        raise RuntimeError("Filename format not recognized.")
 
-print(f"[+] Combined 102400-shot results saved to:\n    {combined_path}")
+    noise_type, min_val, max_val, steps = match.groups()
+
+    # Sort files numerically by eps or lam index
+    def extract_index(f):
+        tag = "eps" if "eps" in f else "lam"
+        match = re.search(rf'{tag}(\d+)', f)
+        return int(match.group(1)) if match else -1
+
+    files = sorted(files, key=extract_index)
+
+    # Read and combine files
+    dfs = []
+    for f in files:
+        df = pd.read_csv(f)
+        if len(df) != 1:
+            raise ValueError(f"Expected 1 row in {f}, but got {len(df)}.")
+        dfs.append(df)
+
+    combined = pd.concat(dfs, ignore_index=True)
+
+    # Build output filename
+    combined_name = f"fidelity_combined_{noise_type}{min_val}-{max_val}_steps{steps}.csv"
+    combined_path = os.path.join(outdir, combined_name)
+    combined.to_csv(combined_path, index=False)
+
+    print(f"[+] Combined {len(files)} files into:\n    {combined_path}")
+
+if __name__ == '__main__':
+    main()

@@ -10,16 +10,20 @@ import os
 from qiskit import QuantumCircuit, transpile, ClassicalRegister, QuantumRegister
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit.quantum_info import (
-    Kraus, SuperOp, Statevector, DensityMatrix, state_fidelity,
-    partial_trace, Operator, SparsePauliOp
+    SparsePauliOp
 )
 from qiskit_aer import AerSimulator
 import qiskit.circuit.classical as qiskit_classical
 from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 from qiskit_aer.noise import (
-    NoiseModel, QuantumError, ReadoutError,
-    depolarizing_error, pauli_error, thermal_relaxation_error
+    NoiseModel,
+    QuantumError,
+    ReadoutError,
+    depolarizing_error,
+    pauli_error,
+    thermal_relaxation_error,
 )
+from qiskit.circuit.library import RZZGate, IGate
 
 class ising_class:
     def __init__(self, d, steps, t, J, h):
@@ -33,19 +37,23 @@ class ising_class:
         dt = self.t / self.steps
         qc = QuantumCircuit(self.d)
         for _ in range(self.steps):
-            for i in range(self.d - 1):
-                qc.cx(i, i + 1)
-                qc.rz(-2 * self.J * dt, i + 1)
-                qc.cx(i, i + 1)
+            # Even pairs
+            for i in range(0, self.d - 1, 2):
+                qc.append(RZZGate(-2 * self.J * dt), [i, i + 1])
+            # Odd pairs
+            for i in range(1, self.d - 1, 2):
+                qc.append(RZZGate(-2 * self.J * dt), [i, i + 1])
+            # Transverse field
             for i in range(self.d):
                 qc.rx(-2 * self.h * dt, i)
         return qc
 
     def apply_ising_to_registers(self, qc):
         ising = self.get_trotterized_ising_circuit()
-        ising_inst = ising.to_instruction()
         for reg in [1, 2, 3]:
-            qc.append(ising_inst, [reg * self.d + i for i in range(self.d)])
+            for gate, qargs, cargs in ising.data:
+                mapped_qargs = [qc.qubits[reg * self.d + ising.qubits.index(q)] for q in qargs]
+                qc.append(gate, mapped_qargs, cargs)
         return qc
 
     def get_trotterized_ising_statevector(self):
@@ -68,6 +76,7 @@ def get_QPA_circuit(d, N, ising_circuit):
         for k in range(d - 1):
             qc.cx(0, 1 + k)
         for k in range(d):
+            qc.append(IGate(label='id_noisy'), [k])
             qc.cswap(0 + k, k + d, k + 2 * d)
         for k in range(d):
             qc.h(k)
@@ -92,13 +101,6 @@ def get_QPA_circuit(d, N, ising_circuit):
         qc = qcSWAP
     return qc
 
-def estimate_qc_and_return_distribution(qc, observables, estimator):
-    pass_manager = generate_preset_pass_manager(3, AerSimulator())
-    isa_circuit = pass_manager.run(qc)
-    qc_transpiled = transpile(isa_circuit)
-    result = estimator.run([(qc_transpiled, observables, None)]).result()
-    return result[0].data.evs
-
 def main():
     parser = argparse.ArgumentParser(
         description="Run the QPA-ising circuit simulation and evaluate fidelity vs noise strength (λ)."
@@ -107,7 +109,7 @@ def main():
     parser.add_argument('--k', type=int, default=3, metavar='NQUBITS',
                         help='Number of qubits per register (default: 3)')
     parser.add_argument('--shots', type=int, default=1024, metavar='SHOTS',
-                        help='Number of shots per circuit execution (default: 4096)')
+                        help='Number of shots per circuit execution (default: 1024)')
     parser.add_argument('--epsilon-min', type=float, default=0.0, metavar='epsilon_MIN',
                         help='Minimum epsilon (noise strength) value to sweep (default: 0.0)')
     parser.add_argument('--epsilon-max', type=float, default=0.009, metavar='epsilon_MAX',
@@ -156,18 +158,25 @@ def main():
     for eps in tqdm(epsilons, desc="Sweeping over ε", unit="ε"):
         # t0 = time.perf_counter()
         noise_model = NoiseModel()
-        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 1), ['h', 'x', 'rx', 'rz'])
-        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 2), ['cx'])
-        estimator = AerEstimator(options=dict(backend_options=dict(noise_model=noise_model, shots=shots, method='statevector')))
-        
+        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 1), ['id_noisy', 'rx'])
+        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 2), ['rzz'])
+        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 3), ['cswap'])
+        readout_error = ReadoutError([[1 - eps, eps], [eps, 1 - eps]])
+        noise_model.add_all_qubit_readout_error(readout_error)
+        estimator = AerEstimator(options={
+            'backend_options': {
+                'noise_model': noise_model,
+                'shots': shots
+            }
+        })
         #, device = 'GPU'
         
         QPA = get_QPA_circuit(k, nqpa, ising)
-        isa_circuit = pass_manager.run(QPA)
-        qc_transpiled = transpile(isa_circuit)
+        # isa_circuit = pass_manager.run(QPA)
+        # qc_transpiled = transpile(isa_circuit)
 
         # t1 = time.perf_counter()
-        result = estimator.run([(qc_transpiled, full_projector, None)]).result()
+        result = estimator.run([(QPA, full_projector, None)]).result()
         # t2 = time.perf_counter()
         fidelity = result[0].data.evs
         purified_fidelity.append(fidelity)

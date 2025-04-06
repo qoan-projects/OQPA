@@ -175,7 +175,7 @@ def main():
                         help='Use only one ε value by index instead of sweeping (default: None)')
     parser.add_argument('--nqpa', type=int, default=1, metavar='NQPA',
                     help='Number of QPA rounds to apply (default: 1)')
-    parser.add_argument('--t', type=float, default=5.0,
+    parser.add_argument('--t', type=float, default=1.0,
                         help='Total evolution time for Ising circuit (default: 5.0)')
     parser.add_argument('--J', type=float, default=1.0,
                         help='Interaction strength J (default: 1.0)')

@@ -1,35 +1,48 @@
 #!/bin/bash
-#SBATCH --job-name=estimation_k3_s102400_nqpa2_ntrot5
+#SBATCH --job-name=estimation
 #SBATCH --partition=submit
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=50
 #SBATCH --mem=64G
 #SBATCH --time=00:20:00
 #SBATCH --array=0-39
-#SBATCH --output=logs/estimation_k3_s102400_nqpa2_ntrot5_%A_%a.out
-#SBATCH --error=logs/estimation_k3_s102400_nqpa2_ntrot5_%A_%a.err
+#SBATCH --output=/dev/null
+#SBATCH --error=/dev/null
 
-echo "Running ε index: $SLURM_ARRAY_TASK_ID on node $(hostname)"
-echo "Using $SLURM_CPUS_ON_NODE CPUs"
+# === Setup task-specific log directory ===
+TASK_TAG=k${K}_shots${SHOTS}_eps${EPS_MIN}-${EPS_MAX}_s${EPS_STEPS}
+JOB_ID=${SLURM_ARRAY_JOB_ID}
+EPS_INDEX=${SLURM_ARRAY_TASK_ID}
+LOGDIR=logs/estimation_${JOB_ID}_${TASK_TAG}
+mkdir -p ${LOGDIR}
 
-# Define parameters
-K=3
-SHOTS=102400
-NQPA=2
-EPS_MIN=0.0
-EPS_MAX=0.009
-EPS_STEPS=40
-EPS_INDEX=$SLURM_ARRAY_TASK_ID
+exec > >(tee ${LOGDIR}/nqpa${NQPA}_ntrot${STEPS}_eps${EPS_INDEX}.out)
+exec 2> >(tee ${LOGDIR}/nqpa${NQPA}_ntrot${STEPS}_eps${EPS_INDEX}.err >&2)
 
-T=5.0
-J=1.0
-H=1.0
-STEPS=5
 
-OUTDIR=data/estimation_k${K}_shots${SHOTS}_nqpa${NQPA}_ntrot${STEPS}
-OUTFILE=fidelity_epsilon${EPS_MIN}-${EPS_MAX}_steps${EPS_STEPS}_eps${EPS_INDEX}.csv
+OUTDIR=data/estimation_${JOB_ID}_${TASK_TAG}
+OUTFILE=nqpa${NQPA}_ntrot${STEPS}_eps${EPS_INDEX}.csv
+mkdir -p ${OUTDIR}
 
-mkdir -p ${OUTDIR} logs
+# === Detailed echo for traceability ===
+echo "========== SLURM Job Info =========="
+echo "Hostname           : $(hostname)"
+echo "Date               : $(date)"
+echo "SLURM Job ID       : ${JOB_ID}"
+echo "SLURM Array Task ID: ${EPS_INDEX}"
+echo "CPUs per node      : ${SLURM_CPUS_ON_NODE}"
+echo ""
+echo "========== Simulation Parameters =========="
+echo "Qubits per reg (k) : ${K}"
+echo "Shots              : ${SHOTS}"
+echo "QPA rounds (NQPA)  : ${NQPA}"
+echo "ε index            : ${EPS_INDEX}"
+echo "ε sweep range      : ${EPS_MIN} → ${EPS_MAX}  (steps: ${EPS_STEPS})"
+echo "Time t             : ${T}"
+echo "Interaction J      : ${J}"
+echo "Field h            : ${H}"
+echo "Trotter steps      : ${STEPS}"
+echo "==========================================="
 
 python aer_estimation.py \
   --k ${K} \

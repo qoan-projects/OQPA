@@ -7,9 +7,11 @@ from tqdm import tqdm
 import time
 import os
 
+from scipy.linalg import expm
 from qiskit import QuantumCircuit, transpile, ClassicalRegister, QuantumRegister
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit.quantum_info import (
+    Statevector,
     SparsePauliOp
 )
 from qiskit_aer import AerSimulator
@@ -62,6 +64,59 @@ class ising_class:
         simulator = AerSimulator()
         result = simulator.run(transpile(qc, simulator)).result()
         return result.get_statevector()
+
+def compute_exact_statevector(k, t, J, h):
+    """
+    Compute the exact statevector for the Ising Hamiltonian:
+    H = -J ∑ Z_i Z_{i+1} - h ∑ X_i
+
+    Args:
+        k: number of qubits
+        t: total evolution time
+        J: interaction strength
+        h: transverse field strength
+
+    Returns:
+        exact_state: Qiskit Statevector object
+    """
+    dim = 2**k
+    I = np.eye(2)
+    X = np.array([[0, 1], [1, 0]])
+    Z = np.array([[1, 0], [0, -1]])
+
+    def kron_n(*ops):
+        out = ops[0]
+        for op in ops[1:]:
+            out = np.kron(out, op)
+        return out
+
+    # Build Hamiltonian
+    H = np.zeros((dim, dim), dtype=complex)
+
+    # Z_i Z_{i+1} terms
+    for q in range(k - 1):
+        ops = [I] * k
+        ops[q] = Z
+        ops[q + 1] = Z
+        H += -J * kron_n(*ops)
+
+    # X_i terms
+    for q in range(k):
+        ops = [I] * k
+        ops[q] = X
+        H += -h * kron_n(*ops)
+
+    # Initial state |000>
+    psi0 = np.zeros(dim, dtype=complex)
+    psi0[0] = 1.0
+
+    # Time evolution: U = exp(-iHt)
+    U = expm(-1j * H * t)
+    psi_final = U @ psi0
+
+    # Convert to Qiskit Statevector
+    return Statevector(psi_final)
+
 
 def get_QPA_circuit(d, N, ising_circuit):
     cr_q0 = ClassicalRegister(d, name='control')
@@ -140,9 +195,9 @@ def main():
     t, J, h, steps = args.t, args.J, args.h, args.steps
 
     ising = ising_class(k, steps, t, J, h)
-    trotterized_state = ising.get_trotterized_ising_statevector()
+    exact_state = compute_exact_statevector(k, t, J, h)
 
-    projector_q3 = SparsePauliOp.from_operator(trotterized_state.to_operator())
+    projector_q3 = SparsePauliOp.from_operator(exact_state.to_operator())
     identity_op = SparsePauliOp(["I" * k])
     # pauli_str = "XYZIXZZIYXYZ"
     # full_projector = SparsePauliOp.from_list([(pauli_str, 1)])
@@ -153,7 +208,7 @@ def main():
     # zero_state = Statevector.from_label("0" * d * 4)
     # full_projector = SparsePauliOp.from_operator(zero_state.to_operator())
     purified_fidelity = []
-    pass_manager = generate_preset_pass_manager(3, AerSimulator())
+    # pass_manager = generate_preset_pass_manager(3, AerSimulator())
 
     for eps in tqdm(epsilons, desc="Sweeping over ε", unit="ε"):
         # t0 = time.perf_counter()

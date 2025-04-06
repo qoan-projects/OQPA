@@ -1,157 +1,123 @@
-# Project Name: QPA (Quantum Purity Amplification) 
+# QPA-Experiments: Quantum Purity Amplification
 
-## Collaboration
-### Current Members ("The Puritans")
-Zhaoyi "Nitan" Li (2nd year PhD in Physics)\
-Takuya Isogawa (3rd year PhD in Nuclear Science)\
-Honghao Fu (Faculty @ Concordia)\
-Caio Silva (junior in Physics)\
-Ike Chuang (Faculty @ MIT)
+**QPA-Experiments** is a simulation framework for studying Quantum Purity Amplification (QPA), a protocol that amplifies the purity of noisy quantum states through iterative entanglement, measurement, and conditional operations. This project enables benchmarking QPA performance across a wide range of noise models and protocol parameters, with support for Trotterized Ising evolution and the SWAPNET architecture. Simulations are optimized for near-term quantum hardware and hybrid analog-digital platforms.
 
-### Meetings
-Weekly meetings (TBD) to catch up on progress
-Notion page:
-(TBA)
+---
 
-## Conda Environment: Step-by-Step Setup
+## 🛠️ Conda Environment Setup
 
-You can set up your environment directly using the `environment.yml` file already included in the repo.
+You can set up your environment directly using the `environment.yml` file provided in the repository:
 
-**Create and activate the environment from the YAML file**
-   ```bash
-   conda env create -f environment.yml
-   conda activate qpa_env
-   ```
+```bash
+conda env create -f environment.yml
+conda activate qpa_env
+```
 
-### Jupyter Notebook Setup
+### Jupyter Notebook Support
+If you're working with Jupyter notebooks:
 
-If Jupyter isn't already installed in the environment, you can add it with:
 ```bash
 conda install jupyter notebook
 ```
 
-To use your environment as a Jupyter kernel:
+To use the QPA environment as a Jupyter kernel:
 ```bash
 python -m ipykernel install --user --name=qpa_env --display-name "QPA Env"
-```
-
-Then you can launch notebooks with:
-```bash
 jupyter notebook
 ```
 
-## API Token Setup
+---
 
-If you're using IBM Quantum services, create a `.env` file in the root of the project directory with the following line:
+## 🔐 IBM Quantum Token Setup
 
+If you're using IBM Quantum services, create a `.env` file in the project root with:
 ```env
 IBM_QUANTUM_TOKEN=your_ibmq_token_here
 ```
 
+---
 
-## GPU-Accelerated Qiskit Aer Setup on SubMIT
+## ⚡ GPU-Accelerated Qiskit Aer on SubMIT
 
-To enable GPU acceleration for `qiskit-aer` on the SubMIT cluster, start by installing the GPU-enabled version:
-
+Install the GPU-enabled Qiskit Aer backend:
 ```bash
 pip install qiskit-aer-cu11
 ```
 
-Then, follow the [SubMIT GPU access guide](https://submit.mit.edu) to request an interactive GPU node via Slurm:
-
+Then request a GPU node:
 ```bash
 salloc --partition=submit-gpu-a30 --cpus-per-gpu=1 --gres=gpu:1 --mem=8G --time=01:00:00
 ```
 
-Once you're on the GPU node (e.g., `submit20`), you need to manually add CUDA to your environment:
-
-
+Set up CUDA manually on the node:
 ```bash
 export CUDA_ROOT=/usr/local/cuda
 export PATH=$CUDA_ROOT/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_ROOT/lib64:$LD_LIBRARY_PATH
 ```
 
-Then check:
-
+Check it works:
 ```bash
 nvcc --version
-```
-
-Finally, confirm that Qiskit Aer recognizes your GPU:
-
-```bash
 python -c "from qiskit_aer import AerSimulator; print(AerSimulator().available_devices())"
 ```
-
-You should see:
-
+Expected output:
 ```
 ('CPU', 'GPU')
 ```
 
+---
 
+## 🧪 Running Batch Simulations
 
-# Project Goal
-QEC is great (theoretically), but the resource budget is jaw dropping. We want to develop alternative method to gated-based QEC more applicable to NISQ applications that can actually make a difference.
+To launch a full batch of QPA simulations across different numbers of QPA rounds (`nqpa`) and Trotter steps (`ntrot`), simply run the script below. You can modify the parameters (such as `nqpa`, `ntrot`, `k`, `shots`, and epsilon sweep settings) directly in the `submit_all.sh` file:
 
-## Current Directions
+```bash
+bash submit_all.sh
+```
 
-### 1. OQPA (Optimal Quantum Purity Amplification), previously known as Quantum state purification
- QPA is a class of quantum protocol that increases the purity of quantum states by consuming copies of noisy states, and OQPA is the info theoretic optimal construction under certain FOM. This question has been studied by many for the past 20 years, but the only solved instance is for qubits. In April 2024 we have solved the problem for $n\to 1$ OQPAs for *qudits* and developed an explicit construction for it. Now we are aiming to find more practical applications of the scheme. (Work to be published)
+This script submits SLURM job arrays that sweep over different values of depolarizing noise strength (`ε`). Each job in the array corresponds to a different `ε` value.
 
- **Open questions**
+### 🔍 Where to find outputs and logs
+- **Simulation output CSVs** are saved in:
+  ```
+  "data/estimation_<JOBID>_k<K>_shots<SHOTS>_eps<MIN>-<MAX>_s<STEPS>/"
+  ```
+- **Log files** are saved in:
+  ```
+  "logs/estimation_<JOBID>_k<K>_shots<SHOTS>_eps<MIN>-<MAX>_s<STEPS>/"
+  ```
+  Each file is named by QPA round, Trotter step count, and epsilon index. For example:
+  ```
+  "nqpa2_ntrot5_eps17.csv"
+  "nqpa2_ntrot5_eps17.out"
+  "nqpa2_ntrot5_eps17.err"
+  ```
 
- 1. The first step of QPA involves strong Schur sampling (measuring the Specht basis), is there a way to do it efficiently? Also we need to figure out how to compile it down to unitary gates for certain experimentally-relavant examples.
+These directories are automatically created for each batch job submission.
 
- 2. The optimality of the $n\to m$ qudit OPQC construction is still unproven, might require heavy rep-theory (or even new math!). Suppose this can be proven, we also need to figure out the operation definition and gate-level implementation for the scheme.
+---
 
- 3. Generalizing optimal QPA to non-spherically symmetric channels and benchmark them.
+## 📁 Project Directory Overview
 
- 4. Futher taylor the current scheme and make it more experimentally feasible, potentially collaborating with experimental groups for POP demo.
+```bash
+purification/
+├── aer_estimation.py             # Main simulation script
+├── aer_simulation.ipynb          # Interactive notebook for running estimations
+├── submit_all.sh                 # Launches all QPA batch jobs
+├── estimate.slurm                # SLURM job script for epsilon array tasks
+├── data/                         # Stores simulation results (.csv)
+├── logs/                         # Stores stdout/stderr from SLURM jobs
+├── env_tests/                    # Notebooks for testing simulation environment
+├── shared_data/                  # Shared data (e.g. simulation results)
+├── full_dm_simulation/           # Exact full density matrix simulations (optional)
+├── QCT_codes/                    # Related code or legacy components
+├── reqs/
+│   └── environment.yml           # Conda environment definition
+├── .env                          # IBM token config
+├── README.md                     # Project documentation (this file)
+└── .gitignore               # Conda environment definition
+├── README.md                     # Project documentation (this file)
+└── .gitignore
+```
 
- 5. The study of PQPA (Probabilistic QPA). The optimal PQPA is conjectured to simply be the symmetrizer, but we need to prove this (Should be a simple proof). See [Protocols and Trade-Offs of Quantum State Purification](https://arxiv.org/abs/2404.01138), an attempt has been made but they weren't able to give a full proof.
-
-
-**Reference**
-
-- Earlier predecessors of QPA include
-[Error symmetrization in quantum computers](https://arxiv.org/abs/quant-ph/9605009).
-
-- The qubit QPA ([Optimal purification of single qubits](https://arxiv.org/abs/quant-ph/9812075), [The Rate of Optimal Purification procedures](https://arxiv.org/abs/quant-ph/9910124)) is intimately connected with [Quantum Majority Vote](https://arxiv.org/abs/2211.11729) and Quantum Cloning, e.g. [Optimal Cloning of Pure States](https://arxiv.org/abs/quant-ph/9804001).
-
-- Experimentally, the $n=2$ case have been studied [Experimental Purification of Single Qubits](https://arxiv.org/abs/quant-ph/0403118).
-
-- Attempts to generalize the scheme to qudits, albeit not optimal, have been attented by Honghao et al. previously [Streaming quantum state purification](https://arxiv.org/abs/2309.16387). 
-
-### 2. **MQPA (McWeeney QPA)/VQPA (Virtual QPA)**
-  
-McWeeney polynomials are a type of classical methods $F(\rho)$ that recursively increase the purify of a given state. A "Quantized" version of this might bring unexpected gains for fault tolerance.
-
-**Open Questions**
-
-- Is it possible to implent McWeeney purifications based on QSP (Quantum signal processing) or LCU(linear compination of unitary) techniques?
-
-- Sometimes, instead of performing the full QPA, we only need to "purify" the measurement outcome for specific target operators. This is called VQPA (Virtural QPA) To what extent we can do this?
-
-**Reference**
-- [Generalized canonical purification for density matrix minimization](https://arxiv.org/abs/1512.07236)
-
-### 3. TQPA (Tomographical QPA)
-
-Instead of using a quantum channel to perform the work, there might be a suboptimal procedure that only involves  measurement and state preparation, i.e. using an entanglement-breaking channel. This might have the advantage of being more expreimentally friendly. 
-
-**Open Questions**
-How does these constructions compare with QST (Quantum state tomography/estimation) schemes? 
-
-**Reference**
-
-[Principal eigenstate classical shadows](https://arxiv.org/abs/2405.13939)
-
-### 4. Schur Transform/Sampling and HSP (Hidden Subgroup Problem)
-
-**Open Questions**
-
-Does measuring branching points of the Bratelli tree (generation of Young Tableaux) offer a potential method to solve the problem?
-
-**Reference**

@@ -35,7 +35,15 @@ def combine_job_folder(path, dest_dir):
     print(f"[+] Moved {combined_filename} → {dest_path}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Combine fidelity files and move outputs to shared_data.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Combine fidelity CSV files across all job folders in a parent directory, "
+            "then move the combined files to a shared destination folder.\n\n"
+            "Example usage:\n"
+            "  python combine_dataa.py --parentdir data/estimation_k3_shots102400_eps0.0-0.009_s40"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter
+    )
     parser.add_argument('--parentdir', type=str, required=True,
                         help='Parent directory containing job subfolders.')
     parser.add_argument('--dest', type=str, default='shared_data',

@@ -28,8 +28,8 @@ from qiskit_aer.noise import (
 from qiskit.circuit.library import RZZGate, IGate
 
 class ising_class:
-    def __init__(self, d, steps, t, J, h):
-        self.d = d
+    def __init__(self, k, steps, t, J, h):
+        self.k = k
         self.steps = steps
         self.t = t
         self.J = J
@@ -37,16 +37,16 @@ class ising_class:
 
     def get_trotterized_ising_circuit(self):
         dt = self.t / self.steps
-        qc = QuantumCircuit(self.d)
+        qc = QuantumCircuit(self.k)
         for _ in range(self.steps):
             # Even pairs
-            for i in range(0, self.d - 1, 2):
+            for i in range(0, self.k - 1, 2):
                 qc.append(RZZGate(-2 * self.J * dt), [i, i + 1])
             # Odd pairs
-            for i in range(1, self.d - 1, 2):
+            for i in range(1, self.k - 1, 2):
                 qc.append(RZZGate(-2 * self.J * dt), [i, i + 1])
             # Transverse field
-            for i in range(self.d):
+            for i in range(self.k):
                 qc.rx(-2 * self.h * dt, i)
         return qc
 
@@ -54,7 +54,7 @@ class ising_class:
         ising = self.get_trotterized_ising_circuit()
         for reg in [1, 2, 3]:
             for gate, qargs, cargs in ising.data:
-                mapped_qargs = [qc.qubits[reg * self.d + ising.qubits.index(q)] for q in qargs]
+                mapped_qargs = [qc.qubits[reg * self.k + ising.qubits.index(q)] for q in qargs]
                 qc.append(gate, mapped_qargs, cargs)
         return qc
 
@@ -118,24 +118,24 @@ def compute_exact_statevector(k, t, J, h):
     return Statevector(psi_final)
 
 
-def get_QPA_circuit(d, N, ising_circuit):
-    cr_q0 = ClassicalRegister(d, name='control')
-    qr_all = QuantumRegister(4 * d)
+def get_QPA_circuit(k, N, ising_circuit):
+    cr_q0 = ClassicalRegister(k, name='control')
+    qr_all = QuantumRegister(4 * k)
     qcSWAP = QuantumCircuit(qr_all, cr_q0)
     qc = ising_circuit.apply_ising_to_registers(qcSWAP)
 
     def recursive(N, qc):
-        for k in range(d):
-            qc.reset(k)
+        for i in range(k):
+            qc.reset(i)
         qc.h(0)
-        for k in range(d - 1):
-            qc.cx(0, 1 + k)
-        for k in range(d):
-            qc.append(IGate(label='id_noisy'), [k])
-            qc.cswap(0 + k, k + d, k + 2 * d)
-        for k in range(d):
-            qc.h(k)
-        for i in range(d):
+        for i in range(k - 1):
+            qc.cx(0, 1 + i)
+        for i in range(k):
+            qc.append(IGate(label='id_noisy'), [i])
+            qc.cswap(0 + i, i + k, i + 2 * k)
+        for i in range(k):
+            qc.h(i)
+        for i in range(k):
             qc.measure(i, cr_q0[i])
             if i == 0:
                 parity_control = qiskit_classical.expr.lift(cr_q0[i])
@@ -144,8 +144,8 @@ def get_QPA_circuit(d, N, ising_circuit):
         with qc.if_test(parity_control) as _else:
             pass
         with _else:
-            for k in range(d):
-                qc.swap(k + 2 * d, k + 3 * d)
+            for i in range(k):
+                qc.swap(i + 2 * k, i + 3 * k)
             if N != 1:
                 qc = recursive(N - 1, qc)
         return qc

@@ -8,9 +8,10 @@
 #SBATCH --array=0-39
 #SBATCH --output=/dev/null
 #SBATCH --error=/dev/null
+#SBATCH --mail-user=ladmon@mit.edu
 
 # === Setup task-specific log directory ===
-TASK_TAG=k${K}_shots${SHOTS}_eps${EPS_MIN}-${EPS_MAX}_s${EPS_STEPS}
+TASK_TAG=k${K}_shots${SHOTS}_eps${EPS_MIN}-${EPS_MAX}_s${EPS_STEPS}_t${T}_J${J}_h${H}
 JOB_ID=${SLURM_ARRAY_JOB_ID}
 EPS_INDEX=${SLURM_ARRAY_TASK_ID}
 TAG=nqpa${NQPA}_ntrot${STEPS}_eps${EPS_INDEX}

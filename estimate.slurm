@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=50
 #SBATCH --mem=64G
 #SBATCH --time=00:20:00
-#SBATCH --array=0-39
+#SBATCH --array=40-40
 #SBATCH --output=/dev/null
 #SBATCH --error=/dev/null
 #SBATCH --mail-user=ladmon@mit.edu

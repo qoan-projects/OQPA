@@ -3,12 +3,12 @@
 #!/bin/bash
 
 K=3
-SHOTS=1024000
+SHOTS=102400
 T=1.0
 J=1.0
 H=1.0
 EPS_MIN=0.0
-EPS_MAX=0.01
+EPS_MAX=0.1
 EPS_STEPS=41
 
 for nqpa in 0 1 2 3; do

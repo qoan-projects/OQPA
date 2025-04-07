@@ -7,11 +7,11 @@ import shutil
 
 def combine_job_folder(path, dest_dir):
     base = os.path.basename(path)
+
     files = sorted(
         glob.glob(os.path.join(path, "nqpa*_ntrot*_eps*.csv")),
-        key=lambda f: int(re.search(r'eps(\d+)', f).group(1))
+        key=lambda f: int(re.search(r'eps(\d+)', os.path.basename(f)).group(1))
     )
-
     if not files:
         print(f"[!] Skipping {base}: no matching eps files.")
         return

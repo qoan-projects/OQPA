@@ -16,8 +16,8 @@ JOB_ID=${SLURM_ARRAY_JOB_ID}
 EPS_INDEX=${SLURM_ARRAY_TASK_ID}
 TAG=nqpa${NQPA}_ntrot${STEPS}_eps${EPS_INDEX}
 
-LOGDIR=logs/estimation_${TASK_TAG}/${JOB_ID}_${TAG}
-OUTDIR=data/estimation_${TASK_TAG}/${JOB_ID}_${TAG}
+LOGDIR=logs/estimation_${TASK_TAG}/${JOB_ID}_nqpa${NQPA}_ntrot${STEPS}
+OUTDIR=data/estimation_${TASK_TAG}/${JOB_ID}_nqpa${NQPA}_ntrot${STEPS}
 OUTFILE=${TAG}.csv
 
 mkdir -p "${LOGDIR}"

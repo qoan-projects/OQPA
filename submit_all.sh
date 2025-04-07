@@ -3,13 +3,13 @@
 #!/bin/bash
 
 K=3
-SHOTS=102400
+SHOTS=1024000
 T=1.0
 J=1.0
 H=1.0
 EPS_MIN=0.0
-EPS_MAX=0.009
-EPS_STEPS=40
+EPS_MAX=0.01
+EPS_STEPS=41
 
 for nqpa in 0 1 2 3; do
   for ntrot in 1 2 3 4 5 6; do

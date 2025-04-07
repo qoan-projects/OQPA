@@ -40,7 +40,7 @@ def main():
             "Combine fidelity CSV files across all job folders in a parent directory, "
             "then move the combined files to a shared destination folder.\n\n"
             "Example usage:\n"
-            "  python combine_dataa.py --parentdir data/estimation_k3_shots102400_eps0.0-0.009_s40"
+            "  python combine_data.py --parentdir data/estimation_k3_shots102400_eps0.0-0.009_s40"
         ),
         formatter_class=argparse.RawTextHelpFormatter
     )
@@ -64,4 +64,4 @@ if __name__ == '__main__':
     main()
 
 
-#example: python combine_dataa.py --parentdir data/estimation_k3_shots102400_eps0.0-0.009_s40
+#example: python combine_data.py --parentdir data/estimation_k3_shots102400_eps0.0-0.009_s40

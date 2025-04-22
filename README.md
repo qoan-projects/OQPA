@@ -119,6 +119,7 @@ purification/
 │   └── aer_simulation.ipynb     # Playground notebook
 │ 
 ├── estimate.slurm               # SLURM script for epsilon-sweep estimation jobs
+├── combine_data.py              # Aggregates and postprocesses estimation outputs
 │ 
 ├── estimation_scripts/          # Runtime Estimator (V2) simulations
 │   ├── aer_estimation.py        # Main estimation script

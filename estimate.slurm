@@ -46,7 +46,7 @@ echo "Field h            : ${H}"
 echo "Trotter steps      : ${STEPS}"
 echo "==========================================="
 
-python aer_estimation.py \
+python estimation_scripts/aer_estimation.py \
   --k ${K} \
   --shots ${SHOTS} \
   --nqpa ${NQPA} \

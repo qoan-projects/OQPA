@@ -5,24 +5,26 @@
 #SBATCH --cpus-per-task=50
 #SBATCH --mem=64G
 #SBATCH --time=00:20:00
-#SBATCH --array=0-39
+#SBATCH --array=0-40
 #SBATCH --output=/dev/null
 #SBATCH --error=/dev/null
+#SBATCH --mail-user=ladmon@mit.edu
 
 # === Setup task-specific log directory ===
-TASK_TAG=k${K}_shots${SHOTS}_eps${EPS_MIN}-${EPS_MAX}_s${EPS_STEPS}
+TASK_TAG=k${K}_shots${SHOTS}_eps${EPS_MIN}-${EPS_MAX}_s${EPS_STEPS}_t${T}_J${J}_h${H}
 JOB_ID=${SLURM_ARRAY_JOB_ID}
 EPS_INDEX=${SLURM_ARRAY_TASK_ID}
-LOGDIR=logs/estimation_${JOB_ID}_${TASK_TAG}
-mkdir -p ${LOGDIR}
+TAG=nqpa${NQPA}_ntrot${STEPS}_eps${EPS_INDEX}
 
-exec > >(tee ${LOGDIR}/nqpa${NQPA}_ntrot${STEPS}_eps${EPS_INDEX}.out)
-exec 2> >(tee ${LOGDIR}/nqpa${NQPA}_ntrot${STEPS}_eps${EPS_INDEX}.err >&2)
+LOGDIR=logs/estimation_${TASK_TAG}/${JOB_ID}_nqpa${NQPA}_ntrot${STEPS}
+OUTDIR=data/estimation_${TASK_TAG}/${JOB_ID}_nqpa${NQPA}_ntrot${STEPS}
+OUTFILE=${TAG}.csv
 
+mkdir -p "${LOGDIR}"
+mkdir -p "${OUTDIR}"
 
-OUTDIR=data/estimation_${JOB_ID}_${TASK_TAG}
-OUTFILE=nqpa${NQPA}_ntrot${STEPS}_eps${EPS_INDEX}.csv
-mkdir -p ${OUTDIR}
+exec > >(tee "${LOGDIR}/${TAG}.out")
+exec 2> >(tee "${LOGDIR}/${TAG}.err" >&2)
 
 # === Detailed echo for traceability ===
 echo "========== SLURM Job Info =========="

@@ -1,7 +1,5 @@
 #!/bin/bash
 
-#!/bin/bash
-
 K=3
 SHOTS=102400
 T=5.0

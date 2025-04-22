@@ -102,22 +102,39 @@ These directories are automatically created for each batch job submission.
 
 ```bash
 purification/
-├── aer_estimation.py             # Main simulation script
-├── aer_simulation.ipynb          # Interactive notebook for running estimations
-├── submit_all.sh                 # Launches all QPA batch jobs
-├── estimate.slurm                # SLURM job script for epsilon array tasks
-├── data/                         # Stores simulation results (.csv)
-├── logs/                         # Stores stdout/stderr from SLURM jobs
-├── env_tests/                    # Notebooks for testing simulation environment
-├── shared_data/                  # Shared data (e.g. simulation results)
-├── full_dm_simulation/           # Exact full density matrix simulations (optional)
-├── QCT_codes/                    # Related code or legacy components
+├── README.md                     # Project documentation
+├── .env                          # Local IBM token (not committed)
+├── .gitignore                   # Ignore cache, logs, env files, etc.
+│ 
 ├── reqs/
-│   └── environment.yml           # Conda environment definition
-├── .env                          # IBM token config
-├── README.md                     # Project documentation (this file)
-└── .gitignore               # Conda environment definition
-├── README.md                     # Project documentation (this file)
-└── .gitignore
+│   └── environment.yml          # Conda environment definition
+│ 
+├── simulate.slurm               # SLURM job script to launch all QPA batch jobs
+├── submit_all.sh                # Helper script to submit all simulations
+├── clean.py                     # Aggregates and postprocesses simulation outputs
+│ 
+├── simulation_scripts/          # AER-based simulator (statevector/density)
+│   ├── aer_simulation.py        # Main simulation script
+│   ├── aer_simulation_extloop.py# Version with external control loop
+│   └── aer_simulation.ipynb     # Playground notebook
+│ 
+├── estimate.slurm               # SLURM script for epsilon-sweep estimation jobs
+│ 
+├── estimation_scripts/          # Runtime Estimator (V2) simulations
+│   ├── aer_estimation.py        # Main estimation script
+│   ├── estimator_aer.ipynb      # Playground notebook
+│   └── estimator_aer_notranspile.ipynb # External loop, no transpilation
+│ 
+├── sampler_scripts/             # Runtime Sampler-based simulations
+│   ├── sampler_aer.ipynb        # Sampler (AER) with external loop
+│   └── sampler_ibm.ipynb        # Sampler (IBM Quantum backend) notebook
+│ 
+├── full_dm_simulation/          # Optional: full density matrix simulations
+├── env_tests/                   # Notebooks for testing environment and tools
+├── QCT codes/                   # Related code on quantum character transformation
+│
+├── logs/                        # SLURM stdout/stderr outputs
+├── data/                        # Final simulation results (.csv)
+└── shared_data/                 # Shared intermediate results (e.g., cached outputs)
 ```
 

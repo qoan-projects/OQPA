@@ -36,7 +36,7 @@ OUTFILE=fidelity_lambda${LAM_MIN}-${LAM_MAX}_steps${LAM_STEPS}_lam${LAMBDA_INDEX
 mkdir -p ${OUTDIR} logs
 
 # Run the simulation
-python aer_simulation.py \
+python simulation_scripts/aer_simulation.py \
   --d ${D} \
   --shots ${SHOTS} \
   --nqpa ${NQPA} \

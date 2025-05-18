@@ -1,9 +1,7 @@
 #!/bin/bash
 
-#!/bin/bash
-
-K=2
-SHOTS=1024000
+K=4
+SHOTS=102400
 T=1.0
 J=1.0
 H=1.0

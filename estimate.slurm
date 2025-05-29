@@ -8,6 +8,7 @@
 #SBATCH --array=0-40
 #SBATCH --output=/dev/null
 #SBATCH --error=/dev/null
+#SBATCH --mail-type=ALL
 #SBATCH --mail-user=ladmon@mit.edu
 
 # === Setup task-specific log directory ===

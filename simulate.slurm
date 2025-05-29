@@ -8,8 +8,8 @@
 #SBATCH --array=0-39
 #SBATCH --output=logs/qpa_sim_d6_s10240_nqpa1_%A_%a.out
 #SBATCH --error=logs/qpa_sim_d6_s10240_nqpa1_%A_%a.err
-#SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=your_email@domain.com
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=ladmon@mit.edu
 
 # CUDA setup (optional)
 echo "Running λ index: $SLURM_ARRAY_TASK_ID on node $(hostname)"

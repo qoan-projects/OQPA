@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import numpy as np
 import pandas as pd
 import argparse
@@ -170,7 +169,7 @@ def main():
     parser.add_argument('--epsilon-max', type=float, default=0.009, metavar='epsilon_MAX',
                         help='Maximum epsilon value to sweep (default: 0.009)')
     parser.add_argument('--epsilon-steps', type=int, default=10, metavar='NSTEPS',
-                        help='Number of steps between λ_min and λ_max (default: 10)')
+                        help='Number of steps between ε_min and ε_max (default: 10)')
     parser.add_argument('--epsilon-index', type=int, default=None,
                         help='Use only one ε value by index instead of sweeping (default: None)')
     parser.add_argument('--nqpa', type=int, default=1, metavar='NQPA',

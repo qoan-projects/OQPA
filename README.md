@@ -110,32 +110,35 @@ purification/
 │   └── environment.yml          # Conda environment definition
 │ 
 ├── simulate.slurm               # SLURM job script to launch all QPA batch jobs
-├── submit_all.sh                # Helper script to submit all simulations
 ├── clean.py                     # Aggregates and postprocesses simulation outputs
-│ 
 ├── simulation_scripts/          # AER-based simulator (statevector/density)
 │   ├── aer_simulation.py        # Main simulation script
 │   ├── aer_simulation_extloop.py# Version with external control loop
 │   └── aer_simulation.ipynb     # Playground notebook
 │ 
-├── estimate.slurm               # SLURM script for epsilon-sweep estimation jobs
-├── combine_data.py              # Aggregates and postprocesses estimation outputs
-│ 
+├── submit_all.sh                # Helper script to submit all sims
+├── estimate.slurm               # SLURM script for eps-sweep jobs
+├── combine_data.py              # Aggregates estimation outputs
 ├── estimation_scripts/          # Runtime Estimator (V2) simulations
 │   ├── aer_estimation.py        # Main estimation script
-│   ├── estimator_aer.ipynb      # Playground notebook
-│   └── estimator_aer_notranspile.ipynb # External loop, no transpilation
+│   ├── estimator_aer_custom_noise.ipynb # Noise model used on paper
+│   └── estimator_aer_old.ipynb      # Playground notebook (deprecated)
 │ 
 ├── sampler_scripts/             # Runtime Sampler-based simulations
 │   ├── sampler_aer.ipynb        # Sampler (AER) with external loop
 │   └── sampler_ibm.ipynb        # Sampler (IBM Quantum backend) notebook
 │ 
 ├── full_dm_simulation/          # Optional: full density matrix simulations
-├── env_tests/                   # Notebooks for testing environment and tools
 ├── QCT codes/                   # Related code on quantum character transformation
 │
+├── ryd_sim_scripts/
+│    ├── run_ryd_sim.slurm       # Submit batch job for simulation rydberg ramping
+│    ├── ryd_sim.py              # Rydberg simulation file
+│    └── sampler_ibm.ipynb       # playground 
+│
 ├── logs/                        # SLURM stdout/stderr outputs
-├── data/                        # Final simulation results (.csv)
-└── shared_data/                 # Shared intermediate results (e.g., cached outputs)
+├── data/                        # Intermediate results
+├── writeup/                     # Summaries
+└── shared_data/                 # Final results (.csv)
 ```
 

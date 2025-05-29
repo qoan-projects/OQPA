@@ -64,4 +64,4 @@ if __name__ == '__main__':
     main()
 
 
-#example: python combine_data.py --parentdir data/estimation_k3_shots102400_eps0.0-0.009_s40
+#example: python combine_data.py --parentdir data/estimation_k3_shots1024000_eps0.0-0.1_s41_t1.0_J1.0_h1.0

@@ -284,9 +284,11 @@ def main():
   print('steps',steps)
 
   #Get Transpiled Circuit for IBM--------------------------------
+  # service = QiskitRuntimeService()
+  # backend = FakeSherbrooke()
   service = QiskitRuntimeService()
-  backend = FakeSherbrooke()
-  backend.refresh(service)
+  backend = service.backend("ibm_sherbrooke")
+
   # 1. Transpile with layout
   ising = ising_class(k, steps, t, J, h)
   trotterized_state = ising.get_trotterized_ising_statevector()
@@ -305,17 +307,17 @@ def main():
   single_control = True
   full_space_fidelity_operator = get_projector(single_control)
   fidelities=[]
-  nqpa_list = [0]
+  nqpa_list = [0,1,2]
   for nqpa in nqpa_list:
     QPA_fake = get_QPA_circuit(k, nqpa, ising,single_control,True)
-    qc_transpiled= transpile(QPA_fake, backend=backend, optimization_level=1)
+    qc_transpiled= transpile(QPA_fake, backend=backend, optimization_level=3)
 
     layout = qc_transpiled.layout
     observable = full_space_fidelity_operator.apply_layout(layout)
     estimator = EstimatorV2(mode=backend)
     estimator.options.default_shots = shots
     job = estimator.run([(qc_transpiled, observable, None)]).result()
-    fidelity = job[0].data.evs  
+    fidelity = job[0].data.evs
     print(f'Found fidelity for nqpa={nqpa}, fidelity={fidelity}')
     fidelities.append(fidelity)
   

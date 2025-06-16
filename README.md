@@ -101,7 +101,7 @@ These directories are automatically created for each batch job submission.
 ## 📁 Project Directory Overview
 
 ```bash
-purification/
+OQPA/
 ├── README.md                     # Project documentation
 ├── .env                          # Local IBM token (not committed)
 ├── .gitignore                   # Ignore cache, logs, env files, etc.
@@ -109,36 +109,78 @@ purification/
 ├── reqs/
 │   └── environment.yml          # Conda environment definition
 │ 
-├── simulate.slurm               # SLURM job script to launch all QPA batch jobs
 ├── clean.py                     # Aggregates and postprocesses simulation outputs
-├── simulation_scripts/          # AER-based simulator (statevector/density)
-│   ├── aer_simulation.py        # Main simulation script
-│   ├── aer_simulation_extloop.py# Version with external control loop
-│   └── aer_simulation.ipynb     # Playground notebook
-│ 
-├── submit_all.sh                # Helper script to submit all sims
-├── estimate.slurm               # SLURM script for eps-sweep jobs
 ├── combine_data.py              # Aggregates estimation outputs
 ├── estimation_scripts/          # Runtime Estimator (V2) simulations
 │   ├── aer_estimation.py        # Main estimation script
-│   ├── estimator_aer_custom_noise.ipynb # Noise model used on paper
-│   └── estimator_aer_old.ipynb      # Playground notebook (deprecated)
+│   ├── custom_state_estimation.py # Custom state estimation implementation
+│   ├── no_if_else_estimation.py  # Estimation without conditional logic
+│   └── other estimation scripts
 │ 
-├── sampler_scripts/             # Runtime Sampler-based simulations
-│   ├── sampler_aer.ipynb        # Sampler (AER) with external loop
-│   └── sampler_ibm.ipynb        # Sampler (IBM Quantum backend) notebook
+├── ibm_backends_scripts/        # IBM Quantum backend scripts
+│   ├── estimator_fakebackend_and_ibm.ipynb # Notebook for fake backend and IBM estimation
+│   ├── fakebackend_estimation.py # Estimation using fake backend
+│   ├── fakebackend_no_if_else_estimation.py # No-if-else estimation with fake backend
+│   ├── ibmprocessors_estimation.py # Estimation using IBM quantum processors
+│   └── ladder_step_initialization_estimation.py # Estimation with ladder step initialization
 │ 
-├── full_dm_simulation/          # Optional: full density matrix simulations
-├── QCT codes/                   # Related code on quantum character transformation
-│
-├── ryd_sim_scripts/
-│    ├── run_ryd_sim.slurm       # Submit batch job for simulation rydberg ramping
-│    ├── ryd_sim.py              # Rydberg simulation file
-│    └── sampler_ibm.ipynb       # playground 
-│
+├── simulation_scripts/          # AER-based simulator scripts
+│   ├── aer_simulation.py        # Main simulation script
+│   └── other simulation scripts
+│ 
+├── ryd_sim_scripts/            # Rydberg simulation scripts
+│   ├── run_ryd_sim.slurm       # Submit batch job for Rydberg simulations
+│   └── ryd_sim.py              # Rydberg simulation file
+│ 
+├── batching_engaging/           # Batching scripts for engagement cluster (e.g., SubMIT)
+│   ├── estimate.sh             # Shell script for aer_estimation jobs
+│   ├── estimate.slurm          # SLURM script for aer_estimation jobs
+│   ├── fake_backend_engaging.sh # Shell script for fake backend jobs
+│   ├── fake_backend_engaging.slurm # SLURM script for fake backend jobs
+│   ├── ladder_step_engaging.sh # Shell script for ladder step initialization jobs
+│   ├── ladder_step_engaging.slurm # SLURM script for ladder step initialization jobs
+│   ├── new_fake_backend_engaging.sh # Updated fake backend engagement script
+│   ├── new_fake_backend_engaging.slurm # Updated SLURM script for fake backend
+│   ├── no_if_else_fidelity_comparison.sh # Shell script for no-if-else fidelity comparison
+│   └── no_if_else_fidelity_comparison.slurm # SLURM script for fidelity comparison
+│ 
+├── batching_submit/             # Batching scripts for submission cluster (e.g., HPC)
+│   ├── estimate.sh             # Shell script for estimation jobs
+│   ├── estimate.slurm          # SLURM script for estimation jobs
+│   ├── fake_backend_submit.sh  # Shell script for fake backend jobs
+│   ├── fake_backend_submit.slurm # SLURM script for fake backend jobs
+│   ├── ibmprocessors_submit.sh # Shell script for IBM processors jobs
+│   ├── ibmprocessors_submit.slurm # SLURM script for IBM processors jobs
+│   ├── ryd_submit.sh           # Shell script for Rydberg simulation jobs
+│   ├── ryd_submit.slurm        # SLURM script for Rydberg simulation jobs
+│   └── simulate.slurm          # Main simulation SLURM script
+│ 
+├── test_single_ryd_batch/       # Test scripts for single Rydberg batch
+│ 
+├── data/                        # Intermediate simulation results
 ├── logs/                        # SLURM stdout/stderr outputs
-├── data/                        # Intermediate results
-├── writeup/                     # Summaries
-└── shared_data/                 # Final results (.csv)
+├── shared_data/                 # Final results and processed data
+├── writeup/                     # Documentation and summaries
+└── QCT_codes/                   # Quantum Character Transformation related code
 ```
+
+## 🔄 Batching System Overview
+
+The batching system is designed to handle distributed computing across different computational clusters. It consists of two main components:
+
+### Batching Engaging (`batching_engaging/`)
+This directory contains SLURM scripts and shell scripts designed for the engagement cluster (typically SubMIT). These scripts are optimized for:
+- Shorter runtime jobs
+- Quick turnaround for iterative development
+- Testing new features and algorithms
+- Fidelity comparisons and small-scale simulations
+
+### Batching Submit (`batching_submit/`)
+This directory contains scripts designed for large-scale HPC cluster submissions. These scripts are optimized for:
+- Large-scale batch simulations
+- Long-running jobs
+- Production runs with many parameter sweeps
+- Resource-intensive computations
+
+Each type of simulation (fake backend, Rydberg, ladder step initialization) has corresponding scripts in both directories to handle different computational requirements and cluster configurations.
 

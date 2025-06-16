@@ -19,6 +19,7 @@ from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 import os
 from qiskit_ibm_runtime import QiskitRuntimeService, EstimatorV2
 from dotenv import load_dotenv
+from qiskit.visualization import circuit_drawer
 # Import from Qiskit Aer noise module
 from qiskit_aer.noise import (
     NoiseModel,
@@ -268,21 +269,41 @@ def main():
                       help='Interaction strength J (default: 1.0)')
   parser.add_argument('--h', type=float, default=1.0,
                       help='Transverse field h (default: 1.0)')
+  parser.add_argument('--nqpa', type=float, default=0,
+                      help='Number of QPA cycles done (default: 0)')
   parser.add_argument('--steps', type=int, default=5,
                       help='Number of Trotter steps (default: 5)')
   parser.add_argument('--output', type=str, default='data/fidelity_fake_backend.csv', metavar='OUTPUT',
                       help='Path to output CSV file (default: data/fidelity_fake_backend.csv)')
+  parser.add_argument('--trotter', type=lambda x: (str(x).lower() == 'true'), default=False,
+                    help='Whether to compute fidelity with trotterized state instead of exact (default: False)')
+  parser.add_argument('--singlecontrol', type=lambda x: (str(x).lower() == 'true'), default=False,
+                    help='Whether to use a single control gate or not (default: False)')
   args = parser.parse_args()
   k = args.k
+  nqpa = args.nqpa
   shots = args.shots
   t, J, h, steps = args.t, args.J, args.h, args.steps
+  single_control = args.singlecontrol
+  trotterized_fidelity = args.trotter
   print('k',k)
   print('shots',shots)
   print('t',t)
   print('J',J)
   print('h',h)
   print('steps',steps)
+  print('Doing QPA with a single control Gate:', single_control)
+  print('Computing fidelity from trotterized state:', trotterized_fidelity)
 
+  out_path = args.output
+  dir_name, base_name = os.path.split(out_path)
+  prefix = "Trotterized_Fidelity" if trotterized_fidelity else "Unitary_Fidelity"
+  prefix += "_single_control" if single_control else "_GHZ"
+  
+  new_base = f"{prefix}_{base_name}"
+  out_path = os.path.join(dir_name, new_base)
+  out_path_transpiled_circuit = os.path.splitext(out_path)[0] + "_transpiled.png"
+  out_path_original_circuit = os.path.splitext(out_path)[0] + "_original.png"
   #Get Transpiled Circuit for IBM--------------------------------
   service = QiskitRuntimeService()
   backend = FakeSherbrooke()
@@ -290,9 +311,11 @@ def main():
   # 1. Transpile with layout
   ising = ising_class(k, steps, t, J, h)
   trotterized_state = ising.get_trotterized_ising_statevector()
+  exact_state = compute_exact_statevector(k, t, J, h)
 
-  def get_projector(single_control= False):
-      fidelity_operator = SparsePauliOp.from_operator(trotterized_state.to_operator())
+
+  def get_projector(state,single_control= False):
+      fidelity_operator = SparsePauliOp.from_operator(state.to_operator())
       identity_op = SparsePauliOp(["I" * (k)])
       if single_control:
           control_identity = SparsePauliOp(["I"])
@@ -302,31 +325,40 @@ def main():
       # full_space_fidelity_operator = identity_op.tensor(fidelity_operator).tensor(identity_op).tensor(control_identity)
       return full_space_fidelity_operator
 
-  single_control = True
-  full_space_fidelity_operator = get_projector(single_control)
-  fidelities=[]
-  nqpa_list = [0,1,2]
-  for nqpa in nqpa_list:
-    QPA_fake = get_QPA_circuit(k, nqpa, ising,single_control,True)
-    qc_transpiled= transpile(QPA_fake, backend=backend, optimization_level=3)
-
-    layout = qc_transpiled.layout
-    observable = full_space_fidelity_operator.apply_layout(layout)
-    estimator = EstimatorV2(mode=backend)
-    estimator.options.default_shots = shots
-    job = estimator.run([(qc_transpiled, observable, None)]).result()
-    fidelity = job[0].data.evs
-    print(f'Found fidelity for nqpa={nqpa}, fidelity={fidelity}')
-    fidelities.append(fidelity)
   
+  if trotterized_fidelity:
+    full_space_fidelity_operator = get_projector(trotterized_state,single_control)
+  else:
+    full_space_fidelity_operator = get_projector(exact_state,single_control)
+  fidelities=[]
+  nqpa_list = [nqpa]
+  QPA_fake = get_QPA_circuit(k, nqpa, ising,single_control,True)
+  qc_transpiled= transpile(QPA_fake, backend=backend, optimization_level=3)
+  # Save original
+  circuit_drawer(QPA_fake, output='mpl', filename=out_path_original_circuit)
+
+  # Save transpiled
+  circuit_drawer(qc_transpiled, output='mpl', filename=out_path_transpiled_circuit)
+
+  layout = qc_transpiled.layout
+  observable = full_space_fidelity_operator.apply_layout(layout)
+  estimator = EstimatorV2(mode=backend)
+  estimator.options.default_shots = shots
+  job = estimator.run([(qc_transpiled, observable, None)]).result()
+  fidelity = job[0].data.evs
+  print(f'Found fidelity for nqpa={nqpa}, fidelity={fidelity}')
+  fidelities.append(fidelity)
+
+
   os.makedirs("data", exist_ok=True)
   df = pd.DataFrame({
     'nqpa_list': list(nqpa_list),
     f'Fidelities': fidelities
     })
+  # os.path.join(base_folder, f"{"single_control" if single_control else "GHZ"}")
   
-  df.to_csv(args.output, index=False)
-  print(f'[+] Output saved to {args.output}')
+  df.to_csv(out_path, index=False)
+  print(f'[+] Output saved to {out_path}')
 
 
 if __name__ == '__main__':

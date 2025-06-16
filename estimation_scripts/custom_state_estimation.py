@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
+
 import numpy as np
 import pandas as pd
 import argparse
 from tqdm import tqdm
 import time
 import os
+from qiskit.visualization import circuit_drawer
 
 from scipy.linalg import expm
 from qiskit import QuantumCircuit, transpile, ClassicalRegister, QuantumRegister
@@ -25,103 +27,29 @@ from qiskit_aer.noise import (
     thermal_relaxation_error,
 )
 from qiskit.circuit.library import RZZGate, IGate
-from qiskit.visualization import circuit_drawer
-class ising_class:
-    def __init__(self, k, steps, t, J, h):
-        self.k = k
-        self.steps = steps
-        self.t = t
-        self.J = J
-        self.h = h
-
-    def get_trotterized_ising_circuit(self):
-        dt = self.t / self.steps
-        qc = QuantumCircuit(self.k)
-        for _ in range(self.steps):
-            # Even pairs
-            for i in range(0, self.k - 1, 2):
-                qc.append(RZZGate(-2 * self.J * dt), [i, i + 1])
-            # Odd pairs
-            for i in range(1, self.k - 1, 2):
-                qc.append(RZZGate(-2 * self.J * dt), [i, i + 1])
-            # Transverse field
-            for i in range(self.k):
-                qc.rx(-2 * self.h * dt, i)
-        return qc
-
-    def apply_ising_to_registers(self, qc):
-        ising = self.get_trotterized_ising_circuit()
-        for reg in [1, 2, 3]:
-            for gate, qargs, cargs in ising.data:
-                mapped_qargs = [qc.qubits[reg * self.k + ising.qubits.index(q)] for q in qargs]
-                qc.append(gate, mapped_qargs, cargs)
-        return qc
-
-    def get_trotterized_ising_statevector(self):
-        qc = self.get_trotterized_ising_circuit()
-        qc.save_statevector()
-        simulator = AerSimulator()
-        result = simulator.run(transpile(qc, simulator)).result()
-        return result.get_statevector()
-
-def compute_exact_statevector(k, t, J, h):
-    """
-    Compute the exact statevector for the Ising Hamiltonian:
-    H = -J ∑ Z_i Z_{i+1} - h ∑ X_i
-
-    Args:
-        k: number of qubits
-        t: total evolution time
-        J: interaction strength
-        h: transverse field strength
-
-    Returns:
-        exact_state: Qiskit Statevector object
-    """
-    dim = 2**k
-    I = np.eye(2)
-    X = np.array([[0, 1], [1, 0]])
-    Z = np.array([[1, 0], [0, -1]])
-
-    def kron_n(*ops):
-        out = ops[0]
-        for op in ops[1:]:
-            out = np.kron(out, op)
-        return out
-
-    # Build Hamiltonian
-    H = np.zeros((dim, dim), dtype=complex)
-
-    # Z_i Z_{i+1} terms
-    for q in range(k - 1):
-        ops = [I] * k
-        ops[q] = Z
-        ops[q + 1] = Z
-        H += -J * kron_n(*ops)
-
-    # X_i terms
-    for q in range(k):
-        ops = [I] * k
-        ops[q] = X
-        H += -h * kron_n(*ops)
-
-    # Initial state |000>
-    psi0 = np.zeros(dim, dtype=complex)
-    psi0[0] = 1.0
-
-    # Time evolution: U = exp(-iHt)
-    U = expm(-1j * H * t)
-    psi_final = U @ psi0
-
-    # Convert to Qiskit Statevector
-    return Statevector(psi_final)
 
 
-def get_QPA_circuit(k, N, ising_circuit):
+import numpy as np
+import sys
+
+
+
+# Continue to run the simulation using input_states
+# You already have this part in your existing code
+
+def get_QPA_circuit(k, N, input_states):
     cr_q0 = ClassicalRegister(k, name='control')
     qr_all = QuantumRegister(4 * k)
     qcSWAP = QuantumCircuit(qr_all, cr_q0)
-    qc = ising_circuit.apply_ising_to_registers(qcSWAP)
+
+    for reg in range(3):
+        input_state = input_states[reg]
+
+        qcSWAP.initialize(input_state, [(reg+1) * k + i for i in range(k)])
+    # qcSWAP.initialize(input_states[0], [4,5,6,7])
+    # qcSWAP.initialize(input_states[1], [8,9,10,11])
+    # qcSWAP.initialize(input_states[2], [12,13,14,15])
+    qc = qcSWAP
 
     def recursive(N, qc):
         for i in range(k):
@@ -159,9 +87,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Run the QPA-ising circuit simulation and evaluate fidelity vs noise strength (λ)."
     )
-
-    parser.add_argument('--k', type=int, default=3, metavar='NQUBITS',
-                        help='Number of qubits per register (default: 3)')
+    parser.add_argument('--k', type=int, default=4, metavar='NQUBITS',
+                        help='Number of qubits per register (default: 4)')
     parser.add_argument('--shots', type=int, default=1024, metavar='SHOTS',
                         help='Number of shots per circuit execution (default: 1024)')
     parser.add_argument('--epsilon-min', type=float, default=0.0, metavar='epsilon_MIN',
@@ -169,19 +96,17 @@ def main():
     parser.add_argument('--epsilon-max', type=float, default=0.009, metavar='epsilon_MAX',
                         help='Maximum epsilon value to sweep (default: 0.009)')
     parser.add_argument('--epsilon-steps', type=int, default=10, metavar='NSTEPS',
-                        help='Number of steps between ε_min and ε_max (default: 10)')
+                        help='Number of steps between λ_min and λ_max (default: 10)')
     parser.add_argument('--epsilon-index', type=int, default=None,
                         help='Use only one ε value by index instead of sweeping (default: None)')
     parser.add_argument('--nqpa', type=int, default=1, metavar='NQPA',
                     help='Number of QPA rounds to apply (default: 1)')
-    parser.add_argument('--t', type=float, default=1.0,
-                        help='Total evolution time for Ising circuit (default: 5.0)')
-    parser.add_argument('--J', type=float, default=1.0,
-                        help='Interaction strength J (default: 1.0)')
-    parser.add_argument('--h', type=float, default=1.0,
-                        help='Transverse field h (default: 1.0)')
-    parser.add_argument('--steps', type=int, default=5,
-                        help='Number of Trotter steps (default: 5)')
+    parser.add_argument('--state-index', type=int, default=0, metavar='STATE-INDEXX',
+                        help='Index of the input state to use (default: 0)')
+    parser.add_argument('--datafile', type=str, default='data/input_states.npz', metavar='DATAFILE',
+                        help='Path to input state data file (default: data/input_states.npz)')
+    parser.add_argument('--exact_state_file', type=str, default='data/exact_state.npz', metavar='EXACT_STATE_FILE',
+                        help='Path to exact state data file (default: data/exact_state.npz)')
     parser.add_argument('--output', type=str, default='data/fidelity_vs_epsilon.csv', metavar='OUTPUT',
                         help='Path to output CSV file (default: data/fidelity_vs_epsilon.csv)')
     args = parser.parse_args()
@@ -189,34 +114,52 @@ def main():
     shots = args.shots
     epsilons = np.linspace(args.epsilon_min, args.epsilon_max, args.epsilon_steps)
     if args.epsilon_index is not None:
-        epsilons = [epsilons[args.epsilon_index]]
+        epsilons = [epsilons[args.epsilon_index]] 
     nqpa = args.nqpa
-    t, J, h, steps = args.t, args.J, args.h, args.steps
 
-    ising = ising_class(k, steps, t, J, h)
-    exact_state = compute_exact_statevector(k, t, J, h)
 
-    projector_q3 = SparsePauliOp.from_operator(exact_state.to_operator())
+    input_index = args.state_index
+    datafile = args.datafile
+    data = np.load(datafile, allow_pickle=True)
+    input_states = data["states"][input_index]
+    
+    
+    exact_state_file = args.exact_state_file
+    exact_state_data = np.load(exact_state_file, allow_pickle=True)
+    exact_state = exact_state_data["state"]
+
+    projector_q3 = SparsePauliOp.from_operator(Statevector(exact_state).to_operator())
     identity_op = SparsePauliOp(["I" * k])
-    # pauli_str = "XYZIXZZIYXYZ"
-    # full_projector = SparsePauliOp.from_list([(pauli_str, 1)])
     full_projector = projector_q3.tensor(identity_op).tensor(identity_op).tensor(identity_op)
-    # full_projector = identity_op.tensor(identity_op).tensor(identity_op).tensor(identity_op)
-
-    # very simple full_projector for debugging, but very slow
-    # zero_state = Statevector.from_label("0" * d * 4)
-    # full_projector = SparsePauliOp.from_operator(zero_state.to_operator())
     purified_fidelity = []
     # pass_manager = generate_preset_pass_manager(3, AerSimulator())
 
     for eps in tqdm(epsilons, desc="Sweeping over ε", unit="ε"):
         # t0 = time.perf_counter()
+        # noise_model = NoiseModel()
+        # noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 1), ['id_noisy', 'rx'])
+        # noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 2), ['rzz'])
+        # noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 3), ['cswap'])
+        # readout_error = ReadoutError([[1 - eps, eps], [eps, 1 - eps]])
+        # noise_model.add_all_qubit_readout_error(readout_error)
         noise_model = NoiseModel()
-        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 1), ['id_noisy', 'rx'])
-        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 2), ['rzz'])
-        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 3), ['cswap'])
+        eps_1q = eps
+        eps_2q = min(30 * eps, 1.0)
+        eps_3q = min(100 * eps, 1.0)
+        print(f'Using noise model of: eps_1q:{eps_1q}, eps_2q:{eps_2q}, eps_3q:{eps_3q}')
+        # 1-qubit gates (ε)
+        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps_1q, 1), ['id_noisy', 'rx'])
+
+        # 2-qubit gates (30ε)
+        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps_2q, 2), ['rzz'])
+
+        # 3-qubit gates (100ε)
+        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps_3q, 3), ['cswap'])
+
+        # Readout error (still ε)
         readout_error = ReadoutError([[1 - eps, eps], [eps, 1 - eps]])
         noise_model.add_all_qubit_readout_error(readout_error)
+    
         estimator = AerEstimator(options={
             'backend_options': {
                 'noise_model': noise_model,
@@ -225,7 +168,7 @@ def main():
         })
         #, device = 'GPU'
         
-        QPA = get_QPA_circuit(k, nqpa, ising)
+        QPA = get_QPA_circuit(k, nqpa, input_states)
         # isa_circuit = pass_manager.run(QPA)
         # qc_transpiled = transpile(isa_circuit)
 
@@ -245,9 +188,9 @@ def main():
     })
     df.to_csv(args.output, index=False)
     print(f'[+] Output saved to {args.output}')
-    # if args.epsilon_index==0:
-    #     circuit_path = args.output.replace(".csv", "_original.png")
-    #     circuit_drawer(QPA, output='mpl', filename=circuit_path)
-    #     print(f"[+] Saved original circuit to {circuit_path}")
+    if args.epsilon_index==0:
+        circuit_path = args.output.replace(".csv", "_original.png")
+        circuit_drawer(QPA, output='mpl', filename=circuit_path)
+        print(f"[+] Saved original circuit to {circuit_path}")
 if __name__ == '__main__':
     main()

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=estimation
+#SBATCH --job-name=ibmprocessors
 #SBATCH --partition=submit
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=80
@@ -13,12 +13,13 @@
 
 source ~/.bashrc
 conda activate qpa_env  # or whatever your environment name is
-TASK_TAG=k${K}_shots${SHOTS}_ID
-TAG=${SLURM_JOB_ID}_ntrot${STEPS}_t${T}_J${J}_h${H}
+TASK_TAG=k${K}_shots${SHOTS}
+TAG=t${T}_J${J}_h${H}_ntrot${STEPS}
+JOB_ID=${SLURM_JOB_ID}
 
-LOGDIR=logs/fake_backend_estimation_${TASK_TAG}/${TAG}
-OUTDIR=data/fake_backend_estimation_${TASK_TAG}/${TAG}
-OUTFILE=${TAG}.csv
+LOGDIR=logs/ibmprocessors_estimation_${TASK_TAG}/nqpa${NQPA}
+OUTDIR=data/ibmprocessors_estimation_${TASK_TAG}/nqpa${NQPA}
+OUTFILE=${TAG}_${JOB_ID}.csv
 
 mkdir -p "${LOGDIR}"
 mkdir -p "${OUTDIR}"
@@ -40,9 +41,12 @@ echo "Time t             : ${T}"
 echo "Interaction J      : ${J}"
 echo "Field h            : ${H}"
 echo "Trotter steps      : ${STEPS}"
+echo "NQPA               : ${NQPA}"
+echo "TROTTER            : ${TROTTER}"
+echo "SINGLE CONTROL     : ${SINGLECONTROL}"
 echo "==========================================="
 
-python estimation_scripts/fakebackend_estimation.py \
+python estimation_scripts/ibmprocessors_estimation.py \
   --k ${K} \
   --shots ${SHOTS} \
   --t ${T} \

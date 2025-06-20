@@ -13,7 +13,7 @@ SINGLECONTROL = True
 
 # === Root directory for data ===
 BASE_ROOT = f"data/new_fake_backend_estimation_k{K}_shots{SHOTS}"
-OUTPUT_DIR = f"shared_data/fake_backend_estimation/fake_backend_estimation_k{K}_shots{SHOTS}"
+OUTPUT_DIR = f"shared_data/fake_backend_estimation/plotting_results/fake_backend_estimation_k{K}_shots{SHOTS}"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # === Tag prefix ===

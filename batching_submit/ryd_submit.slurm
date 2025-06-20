@@ -36,10 +36,10 @@ TAG=eps${EPS_INDEX}_${SLURM_ARRAY_JOB_ID}
 #   → data/ryd_estimation_k${K}_shots${SHOTS}_eps${EPS_MIN}-${EPS_MAX}_s${EPS_STEPS}/nqpa${NQPA}/${JOB_ID}_index${INDEX}/${TAG}.csv
 # Logs will be saved at:
 #   → logs/ryd_estimation_k${K}_shots${SHOTS}_eps${EPS_MIN}-${EPS_MAX}_s${EPS_STEPS}/index${INDEX}/nqpa${NQPA}/${TAG}.out / .err
-LOGDIR=logs/ryd_estimation_${TASK_TAG}/index${INDEX}/nqpa${NQPA}
-OUTDIR=data/ryd_estimation_${TASK_TAG}/index${INDEX}/nqpa${NQPA}
+LOGDIR=logs/ryd_estimation_125_eigenstates_${TASK_TAG}/index${INDEX}/nqpa${NQPA}
+OUTDIR=data/ryd_estimation_125_eigenstates_${TASK_TAG}/index${INDEX}/nqpa${NQPA}
 OUTFILE=${TAG}.csv
-INPUT_STATES_FILE=/home/submit/caiosiq/qpa/purification/shared_data/ryd_estimations/all_states.npz
+INPUT_STATES_FILE=/home/submit/caiosiq/qpa/purification/shared_data/ryd_estimations/all_states_5_eigenstates.npz
 EXACT_STATE_FILE=/home/submit/caiosiq/qpa/purification/shared_data/ryd_estimations/exact_state.npz
 
 

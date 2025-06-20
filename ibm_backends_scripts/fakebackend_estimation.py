@@ -272,7 +272,7 @@ def main():
   parser.add_argument('--nqpa', type=float, default=0,
                       help='Number of QPA cycles done (default: 0)')
   parser.add_argument('--steps', type=int, default=5,
-                      help='Number of Trotter steps (default: 5)')
+                        help='Number of Trotter steps (default: 5)')
   parser.add_argument('--output', type=str, default='data/fidelity_fake_backend.csv', metavar='OUTPUT',
                       help='Path to output CSV file (default: data/fidelity_fake_backend.csv)')
   parser.add_argument('--trotter', type=lambda x: (str(x).lower() == 'true'), default=False,

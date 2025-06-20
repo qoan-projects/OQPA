@@ -20,14 +20,14 @@ TAG=t${T}_J${J}_h${H}_ntrot${STEPS}
 JOB_ID=${SLURM_JOB_ID}
 
 LOGDIR=logs/fake_backend_estimation_${TASK_TAG}/nqpa${NQPA}
-OUTDIR=data/fake_backend_estimation_${TASK_TAG}/nqpa${NQPA}
+OUTDIR=shared_data/fake_backend_estimation/simulation_outputs/fake_backend_estimation_${TASK_TAG}/nqpa${NQPA}
 OUTFILE=${TAG}_${JOB_ID}.csv
 
 mkdir -p "${LOGDIR}"
 mkdir -p "${OUTDIR}"
 
-exec > >(tee "${LOGDIR}/${TAG}.out")
-exec 2> >(tee "${LOGDIR}/${TAG}.err" >&2)
+exec > >(tee "${LOGDIR}/${TAG}_${JOB_ID}.out")
+exec 2> >(tee "${LOGDIR}/${TAG}_${JOB_ID}.err" >&2)
 
 # === Detailed echo for traceability ===
 echo "========== SLURM Job Info =========="
@@ -48,7 +48,7 @@ echo "TROTTER            : ${TROTTER}"
 echo "SINGLE CONTROL     : ${SINGLECONTROL}"
 echo "==========================================="
 
-python estimation_scripts/fakebackend_estimation.py \
+python ibm_backends_scripts/fakebackend_estimation.py \
   --k ${K} \
   --shots ${SHOTS} \
   --t ${T} \

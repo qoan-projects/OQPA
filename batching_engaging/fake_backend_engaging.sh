@@ -6,7 +6,7 @@
 SHOTS=1024
 J=1.0
 H=1.0
-TROTTER=True
+TROTTER=false
 SINGLECONTROL=true
 for K in 2 3; do
   for T in 3.0; do

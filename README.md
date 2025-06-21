@@ -102,8 +102,8 @@ These directories are automatically created for each batch job submission.
 
 ```bash
 OQPA/
-├── README.md                     # Project documentation
-├── .env                          # Local IBM token (not committed)
+├── README.md                    # Project documentation
+├── .env                         # Local IBM token (not committed)
 ├── .gitignore                   # Ignore cache, logs, env files, etc.
 │ 
 ├── reqs/
@@ -111,26 +111,42 @@ OQPA/
 │ 
 ├── clean.py                     # Aggregates and postprocesses simulation outputs
 ├── combine_data.py              # Aggregates estimation outputs
-├── estimation_scripts/          # Runtime Estimator (V2) simulations
-│   ├── aer_estimation.py        # Main estimation script
+│
+│
+├── aer_global_simulationo_scripts/  #global depol. model + QPA experiment
+│   └── aer_simulation.py       #QPA simulation to verify the noiseless case
+│
+├── aer_trotter_estimation_scripts/ # Digital state preparation + QPA experiment
+│   ├── aer_estimation.py         # Main estimation script
+│   └── aer_estimation_custom_noisee.py #sandbox notebook
+│ 
+├── aer_ryd_estimation_scripts/  # Digital state preparation + QPA experiment
+│   ├── ryd_sim_scripts/         # Rydberg simulation scripts
+│   │    ├── run_ryd_sim.slurm        # Submit batch job for Rydberg simulations
+│   │    └── ryd_sim.py               # Rydberg simulation file
+│   └── custom_state_estimation.py #QPA estimation on the extracted eigenstates
+│   # will need to clean up:
+├── fake_backed_trotter_estimation_scripts/ #Digital state preparation + QPA experiment
 │   ├── custom_state_estimation.py # Custom state estimation implementation
 │   ├── no_if_else_estimation.py  # Estimation without conditional logic
 │   └── other estimation scripts
-│ 
-├── ibm_backends_scripts/        # IBM Quantum backend scripts
+│   #will need to clean up:
+├── ibm_backends_scripts/        # Other scripts on IBM backend
 │   ├── estimator_fakebackend_and_ibm.ipynb # Notebook for fake backend and IBM estimation
 │   ├── fakebackend_estimation.py # Estimation using fake backend
 │   ├── fakebackend_no_if_else_estimation.py # No-if-else estimation with fake backend
 │   ├── ibmprocessors_estimation.py # Estimation using IBM quantum processors
 │   └── ladder_step_initialization_estimation.py # Estimation with ladder step initialization
 │ 
-├── simulation_scripts/          # AER-based simulator scripts
+├── fakebackend_global_sampler_scripts # Global noise model + IBM sampler
+│   └── global_sampler.py # Krauss initialization + IBM sampler
+│ 
+├── aer_global_simulation_scripts/          # AER-based simulator scripts
 │   ├── aer_simulation.py        # Main simulation script
 │   └── other simulation scripts
+│
+├── full_dm_simulation_deprecated/          # Simulation files for V1
 │ 
-├── ryd_sim_scripts/            # Rydberg simulation scripts
-│   ├── run_ryd_sim.slurm       # Submit batch job for Rydberg simulations
-│   └── ryd_sim.py              # Rydberg simulation file
 │ 
 ├── batching_engaging/           # Batching scripts for engagement cluster (e.g., SubMIT)
 │   ├── estimate.sh             # Shell script for aer_estimation jobs
@@ -155,7 +171,6 @@ OQPA/
 │   ├── ryd_submit.slurm        # SLURM script for Rydberg simulation jobs
 │   └── simulate.slurm          # Main simulation SLURM script
 │ 
-├── test_single_ryd_batch/       # Test scripts for single Rydberg batch
 │ 
 ├── data/                        # Intermediate simulation results
 ├── logs/                        # SLURM stdout/stderr outputs

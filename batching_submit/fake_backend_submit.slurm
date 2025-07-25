@@ -12,7 +12,7 @@
 # === Setup task-specific log directory ===
 
 source ~/.bashrc
-conda activate qpa_env  # or whatever your environment name is
+conda activate qpa_env 
 TASK_TAG=k${K}_shots${SHOTS}
 TAG=t${T}_J${J}_h${H}_ntrot${STEPS}
 JOB_ID=${SLURM_JOB_ID}

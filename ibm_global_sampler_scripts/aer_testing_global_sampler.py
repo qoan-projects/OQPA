@@ -30,7 +30,7 @@ import os
 from qiskit.visualization import circuit_drawer
 def get_QPA_circuit(k: int,
                     n_qpa: int,
-                    eps: float,
+                    LAMBDA: float,
                     test_depolarization: bool = False) -> QuantumCircuit:
     """
     Build a “do-nothing” circuit, optionally sprinkle manual depolarising
@@ -42,7 +42,7 @@ def get_QPA_circuit(k: int,
         Number of data qubits per register (→ total qubits = 4·k).
     n_qpa : int
         How many recursive QPA rounds to apply.
-    eps : float
+    LAMBDA : float
         Probability to apply a random single-qubit Pauli if
         `test_depolarization` is True.
     test_depolarization : bool
@@ -177,13 +177,13 @@ def main():
                         help='Number of qubits per register (default: 2)')
     parser.add_argument('--shots', type=int, default=1024, metavar='SHOTS',
                         help='Number of shots per circuit execution (default: 1024)')
-    parser.add_argument('--epsilon-min', type=float, default=0.0, metavar='epsilon_MIN',
-                        help='Minimum epsilon (noise strength) value to sweep (default: 0.0)')
-    parser.add_argument('--epsilon-max', type=float, default=0.009, metavar='epsilon_MAX',
-                        help='Maximum epsilon value to sweep (default: 0.009)')
-    parser.add_argument('--epsilon-steps', type=int, default=10, metavar='NSTEPS',
-                        help='Number of steps between ε_min and ε_max (default: 10)')
-    parser.add_argument('--epsilon-index', type=int, default=None,
+    parser.add_argument('--lambda-min', type=float, default=0.0, metavar='lambda_MIN',
+                        help='Minimum lambda (noise strength) value to sweep (default: 0.0)')
+    parser.add_argument('--lambda-max', type=float, default=0.009, metavar='lambda_MAX',
+                        help='Maximum lambda value to sweep (default: 0.009)')
+    parser.add_argument('--lambda-steps', type=int, default=10, metavar='NSTEPS',
+                        help='Number of steps between lambda_min and lambda_max (default: 10)')
+    parser.add_argument('--lambda-index', type=int, default=None,
                         help='Use only one ε value by index instead of sweeping (default: None)')
     parser.add_argument('--nqpa', type=int, default=1, metavar='NQPA',
                     help='Number of QPA rounds to apply (default: 1)')
@@ -191,8 +191,8 @@ def main():
                     help='Number of Circuits to be randomized (default: 1)')
     parser.add_argument('--gatenoise', type=float, default=0.05, metavar='GATENOISE',
                         help='Gate noise strength (default: 0.05)')
-    parser.add_argument('--output', type=str, default='data/fidelity_vs_epsilon.csv', metavar='OUTPUT',
-                        help='Path to output CSV file (default: data/fidelity_vs_epsilon.csv)')
+    parser.add_argument('--output', type=str, default='data/fidelity_vs_lambda.csv', metavar='OUTPUT',
+                        help='Path to output CSV file (default: data/fidelity_vs_lambda.csv)')
     args = parser.parse_args()
     k = args.k
     N_qpa = args.nqpa
@@ -200,9 +200,9 @@ def main():
     n_random = args.nrandom
     shots = round(total_shots/n_random)
     gatenoise = args.gatenoise
-    epsilons = np.linspace(args.epsilon_min, args.epsilon_max, args.epsilon_steps)
-    if args.epsilon_index is not None:
-        epsilons = [epsilons[args.epsilon_index]]
+    lambdas = np.linspace(args.lambda_min, args.lambda_max, args.lambda_steps)
+    if args.lambda_index is not None:
+        lambdas = [lambdas[args.lambda_index]]
 
     purified_fidelity = []
     noise_model = NoiseModel()
@@ -211,13 +211,13 @@ def main():
     noise_model.add_all_qubit_quantum_error(depolarizing_error(gatenoise, 3), ['cswap'])
     readout_error = ReadoutError([[1 - gatenoise, gatenoise], [gatenoise, 1 - gatenoise]])
     noise_model.add_all_qubit_readout_error(readout_error)
-    for eps in tqdm(epsilons, desc="Sweeping over ε", unit="ε"):
+    for lambda_val in tqdm(lambdas, desc="Sweeping over λ", unit="λ"):
         # t0 = time.perf_counter()
         QPA_list = []
         for _ in range(n_random):
-            QPA = get_QPA_circuit(k, N_qpa, eps, test_depolarization=True)
+            QPA = get_QPA_circuit(k, N_qpa, lambda_val, test_depolarization=True)
             QPA_list.append(QPA)
-        if args.epsilon_index==0:
+        if args.lambda_index==0:
             QPA0 = get_QPA_circuit(k, N_qpa, 0, test_depolarization=True)
             circuit_path = args.output.replace(".csv", "_original.png")
             circuit_drawer(QPA0, output='mpl', filename=circuit_path)
@@ -230,7 +230,7 @@ def main():
         print(fidelity)
     os.makedirs("data", exist_ok=True)
     df = pd.DataFrame({
-    'epsilon': list(epsilons),
+    'lambda': list(lambdas),
     f'QPA_{args.nqpa}': purified_fidelity
     })
     df.to_csv(args.output, index=False)

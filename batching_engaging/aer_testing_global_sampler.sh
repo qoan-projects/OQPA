@@ -1,0 +1,12 @@
+#!/bin/bash
+
+K=2
+SHOTS=10240000
+LAMBDA_MIN=0.0
+LAMBDA_MAX=0.1
+LAMBDA_STEPS=41
+NRANDOM=1000
+GATENOISE=0.05
+for nqpa in 0 1; do
+    sbatch --export=K=${K},SHOTS=${SHOTS},NQPA=${nqpa},LAMBDA_MIN=${LAMBDA_MIN},LAMBDA_MAX=${LAMBDA_MAX},LAMBDA_STEPS=${LAMBDA_STEPS},NRANDOM=${NRANDOM},GATENOISE=${GATENOISE} batching_engaging/aer_testing_global_sampler.slurm
+done

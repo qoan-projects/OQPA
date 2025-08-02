@@ -112,69 +112,44 @@ OQPA/
 ├── clean.py                     # Aggregates and postprocesses simulation outputs
 ├── combine_data.py              # Aggregates estimation outputs
 │
-│
-├── aer_global_simulationo_scripts/  #global depol. model + QPA experiment
-│   └── aer_simulation.py       #QPA simulation to verify the noiseless case
+├── aer_global_simulation_scripts/  # AER-based simulator scripts for global noise model + QPA
+│   └── aer_simulation.py        # Main simulation script for QPA with global noise model
 │
 ├── aer_trotter_estimation_scripts/ # Digital state preparation + QPA experiment
-│   ├── aer_estimation.py         # Main estimation script
-│   └── aer_estimation_custom_noisee.py #sandbox notebook
+│   └── aer_estimation.py        # Main estimation script for Trotterized evolution
 │ 
-├── aer_ryd_estimation_scripts/  # Digital state preparation + QPA experiment
+├── aer_ryd_estimation_scripts/  # Rydberg state preparation + QPA experiment
 │   ├── ryd_sim_scripts/         # Rydberg simulation scripts
-│   │    ├── run_ryd_sim.slurm        # Submit batch job for Rydberg simulations
-│   │    └── ryd_sim.py               # Rydberg simulation file
-│   └── custom_state_estimation.py #QPA estimation on the extracted eigenstates
-│   # will need to clean up:
-├── fake_backed_trotter_estimation_scripts/ #Digital state preparation + QPA experiment
-│   ├── custom_state_estimation.py # Custom state estimation implementation
-│   ├── no_if_else_estimation.py  # Estimation without conditional logic
-│   └── other estimation scripts
-│   #will need to clean up:
-├── ibm_backends_scripts/        # Other scripts on IBM backend
-│   ├── estimator_fakebackend_and_ibm.ipynb # Notebook for fake backend and IBM estimation
-│   ├── fakebackend_estimation.py # Estimation using fake backend
-│   ├── fakebackend_no_if_else_estimation.py # No-if-else estimation with fake backend
-│   ├── ibmprocessors_estimation.py # Estimation using IBM quantum processors
-│   └── ladder_step_initialization_estimation.py # Estimation with ladder step initialization
-│ 
-├── fakebackend_global_sampler_scripts # Global noise model + IBM sampler
-│   └── global_sampler.py # Krauss initialization + IBM sampler
-│ 
-├── aer_global_simulation_scripts/          # AER-based simulator scripts
-│   ├── aer_simulation.py        # Main simulation script
-│   └── other simulation scripts
+│   │    ├── run_ryd_sim.slurm   # Submit batch job for Rydberg simulations
+│   │    └── ryd_sim.py          # Rydberg simulation implementation
+│   └── custom_state_estimation.py # QPA estimation on extracted Rydberg eigenstates
 │
-├── full_dm_simulation_deprecated/          # Simulation files for V1
-│ 
-│ 
+├── full_dm_simulation/          # Full density matrix simulation implementation
+│   └── circuit_based_full_dm.ipynb  # Jupyter notebook for full density matrix circuit simulation
+│
+├── ibm_global_sampler_scripts/  # IBM Quantum experiments with global noise model
+│   └── three_circuits_ibm_global_sampler.py  # Implementation of QPA with three circuits on IBMQ
+│
 ├── batching_engaging/           # Batching scripts for engagement cluster (e.g., SubMIT)
 │   ├── estimate.sh             # Shell script for aer_estimation jobs
 │   ├── estimate.slurm          # SLURM script for aer_estimation jobs
-│   ├── fake_backend_engaging.sh # Shell script for fake backend jobs
-│   ├── fake_backend_engaging.slurm # SLURM script for fake backend jobs
-│   ├── ladder_step_engaging.sh # Shell script for ladder step initialization jobs
-│   ├── ladder_step_engaging.slurm # SLURM script for ladder step initialization jobs
-│   ├── new_fake_backend_engaging.sh # Updated fake backend engagement script
-│   ├── new_fake_backend_engaging.slurm # Updated SLURM script for fake backend
-│   ├── no_if_else_fidelity_comparison.sh # Shell script for no-if-else fidelity comparison
-│   └── no_if_else_fidelity_comparison.slurm # SLURM script for fidelity comparison
+│   └── other SLURM and shell scripts for various experiments
 │ 
 ├── batching_submit/             # Batching scripts for submission cluster (e.g., HPC)
 │   ├── estimate.sh             # Shell script for estimation jobs
 │   ├── estimate.slurm          # SLURM script for estimation jobs
-│   ├── fake_backend_submit.sh  # Shell script for fake backend jobs
-│   ├── fake_backend_submit.slurm # SLURM script for fake backend jobs
-│   ├── ibmprocessors_submit.sh # Shell script for IBM processors jobs
-│   ├── ibmprocessors_submit.slurm # SLURM script for IBM processors jobs
-│   ├── ryd_submit.sh           # Shell script for Rydberg simulation jobs
-│   ├── ryd_submit.slurm        # SLURM script for Rydberg simulation jobs
-│   └── simulate.slurm          # Main simulation SLURM script
-│ 
+│   └── other SLURM and shell scripts for HPC submission
 │ 
 ├── data/                        # Intermediate simulation results
 ├── logs/                        # SLURM stdout/stderr outputs
 ├── shared_data/                 # Final results and processed data
+│   ├── aer_global_simulation/   # Results from global noise model simulations
+│   ├── aer_trotter_estimation/  # Results from Trotterized evolution experiments
+│   ├── aer_ryd_estimation/      # Results from Rydberg state experiments
+│   ├── three_circuits_ibm_global_sampler/      # Results from IBM Quantum experiments
+│   ├── unitary_evolved_full_dm/ # Results from full density matrix simulations
+│   ├── main_plotting.ipynb       # Notebook used to generate the main figures
+│   └── SI_plotting.ipynb        # Notebook used to generate the supplementary figures
 ├── writeup/                     # Documentation and summaries
 └── QCT_codes/                   # Quantum Character Transformation related code
 ```

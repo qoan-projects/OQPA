@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
 """
-QPA-ising circuit simulation with simplified implementation.
+QPA (Quantum Purification Algorithm) driver for k=2 registers on IBM hardware, Fake Backend, or AER Simulator.
 
-This implementation uses:
-- k=2 qubits per register
-- Single control qubit
-- Single QPA sequence (H, CSWAP, H)
-- Two projectors for z=0 and z=1 states
+This script builds QPA circuits with up to three halting rounds, injects
+global depolarizing noise by random local Paulis on the input registers,
+and either (i) submits jobs and saves job IDs, or (ii) executes and
+aggregates fidelities via SamplerV2/Aer.
+
+Key features
+------------
+- Registers: three k-qubit registers (q1, q2, q3) plus up to three
+  1-qubit controls (z, z', z'').
+- Rounds: QPA_0/1/2/3 implement 0–3 halting points (H–CSWAP–H blocks).
+- Noise: with probability LAMBDA, a random Pauli on each qubit of each
+  input register.
+- Output: CSV of job IDs or fidelity vs λ for a selected N_QPA.
+
+Command-line flags select backend (IBM Cloud, Fake*, or Aer), λ sweep,
+number of random circuit instances, and shots per run.
 """
 from itertools import product
 import numpy as np
@@ -35,6 +46,26 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
 def get_QPA_circuit_0(k, LAMBDA):
+    """
+    Build the QPA "n=0" circuit (no H–CSWAP–H block).
+
+    Applies random single-qubit Paulis to each of the three k-qubit input
+    registers with per-register probability LAMBDA, then measures:
+    - 3 control qubits (z, z', z''),
+    - all qubits of registers q2 and q3 (used in post-selection).
+
+    Parameters
+    ----------
+    k : int
+        Qubits per data register (k=2 used in this work).
+    LAMBDA : float
+        Probability to apply random Paulis to each input register.
+
+    Returns
+    -------
+    QuantumCircuit
+        Circuit with classical controls and measurements attached.
+    """
     # Three control qubit
     cr = ClassicalRegister(2*k+3, name='control') #Will only Measure q3
     qr_all = QuantumRegister(3*k + 3)
@@ -68,6 +99,25 @@ def get_QPA_circuit_0(k, LAMBDA):
     return qc
     
 def get_QPA_circuit_1(k, LAMBDA):
+    """
+    Build the QPA circuit with one halting round (H–CSWAP(q1,q2)–H).
+
+    After noise injection on the three input registers, performs an
+    H–CSWAP–H block controlled by z on (q1, q2), then measures controls
+    and the q2/q3 registers.
+
+    Parameters
+    ----------
+    k : int
+        Qubits per data register.
+    LAMBDA : float
+        Probability to apply random Paulis to each input register.
+
+    Returns
+    -------
+    QuantumCircuit
+        Circuit implementing the first QPA round and measurements.
+    """
     # Three control qubit
     cr = ClassicalRegister(2*k+3, name='control') #Will only Measure q3
     qr_all = QuantumRegister(3*k + 3)
@@ -106,6 +156,26 @@ def get_QPA_circuit_1(k, LAMBDA):
     return qc
 
 def get_QPA_circuit_2(k, LAMBDA):
+    """
+    Build the QPA circuit with two halting rounds.
+
+    Sequence:
+      1) H–CSWAP(z : q1↔q2)–H
+      2) H–CSWAP(z' : q1↔q3)–H
+    Noise is injected before the rounds. Measures controls and q2/q3.
+
+    Parameters
+    ----------
+    k : int
+        Qubits per data register.
+    LAMBDA : float
+        Probability to apply random Paulis to each input register.
+
+    Returns
+    -------
+    QuantumCircuit
+        Circuit implementing two QPA rounds and measurements.
+    """
     # Three control qubit
     cr = ClassicalRegister(2*k+3, name='control') #Will only Measure q3
     qr_all = QuantumRegister(3*k + 3)
@@ -149,6 +219,27 @@ def get_QPA_circuit_2(k, LAMBDA):
         qc.measure(3+2*k+i,cr[3+k+i])
     return qc
 def get_QPA_circuit_3(k, LAMBDA):
+    """
+    Build the QPA circuit with three halting rounds.
+
+    Sequence:
+      1) H–CSWAP(z  : q1↔q2)–H
+      2) H–CSWAP(z' : q1↔q3)–H
+      3) H–CSWAP(z'': q1↔q2)–H
+    Noise is injected before the rounds. Measures controls and q2/q3.
+
+    Parameters
+    ----------
+    k : int
+        Qubits per data register.
+    LAMBDA : float
+        Probability to apply random Paulis to each input register.
+
+    Returns
+    -------
+    QuantumCircuit
+        Circuit implementing three QPA rounds and measurements.
+    """
     # Three control qubit
     cr = ClassicalRegister(2*k+3, name='control') #Will only Measure q3
     qr_all = QuantumRegister(3*k + 3)
@@ -198,10 +289,46 @@ def get_QPA_circuit_3(k, LAMBDA):
     return qc
 
 def save_circuit_images(qc, out_path):
+    """
+    Render and save a circuit diagram (Matplotlib backend).
+
+    Parameters
+    ----------
+    qc : QuantumCircuit
+        Circuit to draw.
+    out_path : str or os.PathLike
+        Destination image path (extension added by Matplotlib).
+    """
     circuit_drawer(qc, output='mpl', filename=out_path)
 
 def find_good_bitstrings(n, k, nqpa, full_nqpa, verbose=False):
-    """Returns good bitstrings for circuit"""
+    """
+    Enumerate measurement bitstrings accepted for a given halting round.
+
+    The returned strings encode (q3 || q2 || controls) in that order.
+    For round n:
+      - 'success' (z_n=0 and z_{<n} fixed) contributes only when n==nqpa.
+      - 'failure' (z_n=1 with earlier controls fixed) contributes for each n.
+    Parity of n selects whether q2 or q3 must be all zeros.
+
+    Parameters
+    ----------
+    n : int
+        Round index (1-based; n=0 is the pre-round case).
+    k : int
+        Qubits per data register.
+    nqpa : int
+        Number of halting rounds realized by the circuit being analyzed.
+    full_nqpa : int
+        Maximum number of controls present (total control bits).
+    verbose : bool, optional
+        If True, print internal construction details.
+
+    Returns
+    -------
+    list[str]
+        Accepted bitstrings for post-selection (as '0'/'1' strings).
+    """
 
     if verbose:
         print(f"Running find_good_bitstrings with n={n}, k={k}, nqpa={nqpa}, full_nqpa={full_nqpa}")
@@ -275,6 +402,16 @@ def find_good_bitstrings(n, k, nqpa, full_nqpa, verbose=False):
 
 
 def print_bitstrings(bitstrings, k):
+    """
+    Pretty-print accepted bitstrings split into (q3, q2, z, z', z'').
+
+    Parameters
+    ----------
+    bitstrings : Iterable[str]
+        Collection of bitstrings returned by `find_good_bitstrings`.
+    k : int
+        Qubits per data register (used to slice q3 and q2).
+    """
     for b in bitstrings:
         q3 = b[:k]
         q2 = b[k:2*k]
@@ -286,10 +423,53 @@ def print_bitstrings(bitstrings, k):
     
 
 def submit_pauli_job(qc_list, shots, sampler, backend,job_name='Three circuits QPA'):
+    """
+    Transpile and submit a batch of circuits to a SamplerV2-compatible runner.
+
+    Parameters
+    ----------
+    qc_list : list[QuantumCircuit]
+        Circuits to execute as a batch.
+    shots : int
+        Shots per circuit.
+    sampler : SamplerV2 or AerSampler
+        Primitive used to run the circuits.
+    backend : Backend
+        Backend used for transpilation and/or execution.
+    job_name : str, optional
+        Descriptive name for the submitted job.
+
+    Returns
+    -------
+    PrimitiveJob
+        Handle from which results or job_id can be obtained.
+    """
     qc_transpiled_list = transpile(qc_list, backend=backend, optimization_level=3)
     return sampler.run(qc_transpiled_list, shots=shots)
 
 def compute_fidelity(result, qc_list, accepted_bitstrings,shots):
+    """
+    Compute per-batch fidelity by post-selection over accepted bitstrings.
+
+    For each circuit i, sums counts over `accepted_bitstrings` and divides
+    by `shots`. Returns the average across circuits.
+
+    Parameters
+    ----------
+    result : SamplerResult (sequence-like)
+        Result object returned by SamplerV2.run(...).result().
+    qc_list : list[QuantumCircuit]
+        Circuits whose results are being analyzed.
+    accepted_bitstrings : Iterable[str]
+        Bitstrings considered "good" for this (nqpa, n, k) configuration.
+    shots : int
+        Shots per circuit.
+
+    Returns
+    -------
+    float
+        Mean fidelity across the batch.
+    """
     fid = 0
     for i in range(len(qc_list)):
         pub_result = result[i]
@@ -301,7 +481,18 @@ def compute_fidelity(result, qc_list, accepted_bitstrings,shots):
 
 def main():
     """
-    Main function to run the QPA-ising circuit simulation.
+    CLI entry point.
+
+    Parses arguments, builds the appropriate QPA circuits for the selected
+    λ index, backend, and number of random instances, and either:
+      (a) submits jobs and writes job IDs to CSV; or
+      (b) runs and writes fidelity vs λ for the selected N_QPA.
+
+    Side effects
+    ------------
+    - Saves circuit images at λ=λ_min (index 0).
+    - Writes CSV with job IDs or fidelities, depending on mode.
+    - Prints progress/messages to stdout.
     """
     parser = argparse.ArgumentParser(
         description="Run the QPA-ising circuit simulation and evaluate fidelity vs noise strength (λ)."

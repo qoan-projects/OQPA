@@ -147,7 +147,9 @@ OQPA/
 │   ├── aer_trotter_estimation/  # Results from Trotterized evolution experiments
 │   ├── aer_ryd_estimation/      # Results from Rydberg state experiments
 │   ├── three_circuits_ibm_global_sampler/      # Results from IBM Quantum experiments
-│   └── unitary_evolved_full_dm/ # Results from full density matrix simulations
+│   ├── unitary_evolved_full_dm/ # Results from full density matrix simulations
+│   ├── main_plotting.ipynb       # Notebook used to generate the main figures
+│   └── SI_plotting.ipynb        # Notebook used to generate the supplementary figures
 ├── writeup/                     # Documentation and summaries
 └── QCT_codes/                   # Quantum Character Transformation related code
 ```

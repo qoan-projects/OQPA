@@ -1,0 +1,15 @@
+--- Simulating Heuristic Inference (N=5) ---
+--- Simulating Hybrid Cyclic (N=5) ---
+--- Simulating Hybrid Cyclic (N=3) ---
+
+[+] Results saved to /home/caiosiq/OQPA-public/more_registers_qpa/results/better_heurestic_n5/
+-------Testing Antisymmetry case -----------
+N_trials=1
+Results of Heurestic: 0.87364
+Results of Hybrid: 0.0
+N_trials=2
+Results of Heurestic: 0.94736
+Results of Hybrid: 0.62514
+N_trials=3
+Results of Heurestic: 0.93726
+Results of Hybrid: 0.73666

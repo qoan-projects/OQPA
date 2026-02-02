@@ -1,0 +1,55 @@
+#!/bin/bash
+#SBATCH --job-name=qpa_simulation
+#SBATCH --output=../data/logs/qpa_%j.out
+#SBATCH --error=../data/logs/qpa_%j.err
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --mem=256G
+#SBATCH --cpus-per-task=4
+#SBATCH --time=08:00:00
+#SBATCH --partition=mit_normal
+
+# Load modules if necessary (adapt to your cluster environment)
+# module load python/3.10
+source ~/.bashrc
+module load miniforge/24.3.0-0
+conda activate qpa_env  
+# Set environment variables for Qiskit Aer parallelization
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export QISKIT_AER_PARALLEL=True
+
+# Activate virtual environment if used
+# source venv/bin/activate
+
+echo "Starting QPA Simulation on $(hostname)"
+echo "Date: $(date)"
+echo "CPUs: $SLURM_CPUS_PER_TASK"
+
+# NOTE: This script assumes it is submitted from the 'scripts' directory.
+# i.e., cd scripts && sbatch batch_job.slurm
+
+# Example 1: Run AER with Dynamic Circuits (Standard)
+# echo "Running AER Dynamic..."
+# python3 ../main.py --backend aer --method dynamic --n 5 --k 2 --trials 3 --points 25  --shots 400000 --output ../data/results/k2/n5/n_trials3/results_aer_dynamic.csv
+
+# Example 2: Run AER with Unrolled Circuits + Pauli Noise (Verification)
+# This verifies that the unrolled logic matches the dynamic logic on the simulator.
+# echo "Running AER Unrolled (Verification)..."
+# python3 ../main.py --backend aer --method unrolled --n 5 --k 2 --trials 4 --points 25 --shots 50000 --n-random 2000 --output ../data/results/k2/n5/n_trials4/results_aer_unrolled.csv
+
+# Example 3: Run Fake Backend (Unrolled)
+# echo "Running Fake Backend..."
+# python3 ../main.py --backend fake --device ibm_marrakesh --method unrolled --n 5 --k 2 --trials 3 --points 25 --shots 200 --n-random 200 --output ../data/results/k2/n5/n_trials3/results_fake.csv
+
+# Example 4: Run IBM Backend (Post-Only)
+# This submits all jobs to the queue without waiting for results.
+echo "Submitting IBM Jobs (Post-Only)..."
+python3 ../main.py --backend ibm --device ibm_marrakesh --method unrolled --n 5 --k 2 --trials 3 --points 25 --shots 200 --n-random 200 --post-only --output ../data/results/k2/n5/n_trials3/results_ibm_placeholder.csv
+
+# Example 5: Retrieve IBM Results
+# Note: This will only succeed if the jobs finish within the SLURM job runtime.
+# Otherwise, run this script manually later.
+# echo "Attempting to retrieve IBM results..."
+# python3 ../retrieve_results.py --backend ibm --device ibm_marrakesh --output ../data/results/k2/n5/n_trials3/results_ibm.csv
+
+echo "Job Complete"

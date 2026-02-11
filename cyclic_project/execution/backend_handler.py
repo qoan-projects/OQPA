@@ -72,7 +72,25 @@ class FakeBackendHandler(BackendHandler):
         elif "brisbane" in self.backend_name:
             return FakeBrisbane()
         else:
-            print(f"Warning: Unknown fake backend '{self.backend_name}'. Defaulting to FakeSherbrooke.")
+            # Fallback: Try to fetch real backend properties from IBM and create an AerSimulator
+            print(f"Note: '{self.backend_name}' not found in standard Fake Providers.")
+            print(f"Attempting to fetch device properties from IBM Runtime to create a noise model...")
+            try:
+                # We need a temporary service connection just to get backend properties
+                # Reusing IBMRuntimeHandler logic or creating a service directly
+                token = os.getenv("IBM_API") or os.getenv("IBM_QUANTUM_TOKEN")
+                # Simple check to see if we can connect
+                if token:
+                    service = QiskitRuntimeService(channel="ibm_cloud", token=token)
+                    real_backend = service.backend(self.backend_name)
+                    print(f"Successfully fetched properties for '{self.backend_name}'. Creating AerSimulator.")
+                    return AerSimulator.from_backend(real_backend)
+                else:
+                     print("Error: No IBM API token found to fetch backend properties.")
+            except Exception as e:
+                print(f"Failed to create fake backend from real device: {e}")
+                
+            print(f"Warning: Defaulting to FakeSherbrooke as fallback.")
             return FakeSherbrooke()
 
     def get_sampler(self, backend=None):

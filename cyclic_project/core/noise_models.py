@@ -106,3 +106,30 @@ class PauliTwirlingStrategy(NoiseStrategy):
                     idx = self.rng.integers(0, 4)
                     p_gate = pauli_gates[idx]
                     qc.append(p_gate, [q])
+
+    def generate_noise_ops(self, registers: List[QuantumRegister], epsilon: float) -> List[tuple]:
+        """
+        Generates a list of noise operations (gate, logical_qubit) without modifying the circuit.
+        
+        Args:
+            registers: List of target registers.
+            epsilon: Error probability.
+            
+        Returns:
+            List[tuple]: List of (gate, qubit_object) tuples.
+        """
+        if epsilon <= 0:
+            return []
+
+        ops = []
+        pauli_gates = [IGate(), XGate(), YGate(), ZGate()]
+        
+        for reg in registers:
+            if self.rng.random() < epsilon:
+                for q in reg:
+                    idx = self.rng.integers(0, 4)
+                    p_gate = pauli_gates[idx]
+                    # Only add if not Identity (optimization)
+                    if idx != 0: 
+                        ops.append((p_gate, q))
+        return ops

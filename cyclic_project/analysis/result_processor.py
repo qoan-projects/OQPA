@@ -92,27 +92,79 @@ class ResultProcessor:
         Returns:
             float: Global Fidelity (0.0 to 1.0).
         """
-        global_fidelity = 0.0
+        # New Logic: Group by condition (path type)
+        # We aggregate s_i and N_i for all circuits that share the same condition set (path).
+        # Fidelity = Sum_over_paths ( Total_Success_Path / Total_Shots_Path )
+        
+        # Key: tuple(sorted(conditions.items())) -> Value: {'success': 0, 'total': 0}
+        path_stats = {}
         
         for i, counts in enumerate(results):
             meta = circuits_metadata[i]
+            # Convert conditions dict to hashable tuple
             conditions = meta.get('conditions', {})
+            cond_key = tuple(sorted((int(k), v) for k, v in conditions.items()))
+            
             total_clbits = total_clbits_list[i]
             
             # Filter
             filtered = filter_counts(counts, conditions, total_clbits)
             
-            # Successes in this path
+            # Successes in this path (matching conditions AND readout=0)
             s_i = calculate_success_rate(filtered, self.k, total_clbits)
             
             # Total shots run for THIS circuit
-            # We need the raw total shots from the counts (before filtering)
             N_i = get_total_shots(counts) 
             
             if N_i > 0:
-                global_fidelity += (s_i / N_i)
+                if cond_key not in path_stats:
+                    path_stats[cond_key] = {'success': 0, 'total': 0}
+                path_stats[cond_key]['success'] += s_i
+                path_stats[cond_key]['total'] += N_i
+        
+        batch_avg_fidelity = 0.0
+        for key, stats in path_stats.items():
+            if stats['total'] > 0:
+                # This is the probability of this path succeeding (averaged over instances in this batch)
+                path_prob = stats['success'] / stats['total']
+                batch_avg_fidelity += path_prob
                 
-        return global_fidelity
+        return batch_avg_fidelity
+
+    def aggregate_batch_stats(self, 
+                            results: List[Dict[str, int]], 
+                            circuits_metadata: List[Dict[str, Any]], 
+                            total_clbits_list: List[int]) -> Dict[tuple, Dict[str, int]]:
+        """
+        Aggregates success and total counts per path type for a single batch.
+        
+        Args:
+            results: List of count dictionaries.
+            circuits_metadata: List of metadata dictionaries.
+            total_clbits_list: List of total classical bits.
+            
+        Returns:
+            Dict[tuple, Dict[str, int]]: A dictionary mapping path condition keys to {'success': int, 'total': int}.
+        """
+        path_stats = {}
+        
+        for i, counts in enumerate(results):
+            meta = circuits_metadata[i]
+            conditions = meta.get('conditions', {})
+            cond_key = tuple(sorted((int(k), v) for k, v in conditions.items()))
+            
+            total_clbits = total_clbits_list[i]
+            filtered = filter_counts(counts, conditions, total_clbits)
+            s_i = calculate_success_rate(filtered, self.k, total_clbits)
+            N_i = get_total_shots(counts)
+            
+            if N_i > 0:
+                if cond_key not in path_stats:
+                    path_stats[cond_key] = {'success': 0, 'total': 0}
+                path_stats[cond_key]['success'] += s_i
+                path_stats[cond_key]['total'] += N_i
+                
+        return path_stats
 
     def process_dynamic_result(self, counts: Dict[str, int], total_clbits: int) -> float:
         """

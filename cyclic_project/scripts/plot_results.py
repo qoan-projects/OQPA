@@ -9,7 +9,7 @@ import itertools
 # --- Configuration ---
 # Add your CSV files here if you prefer not to use CLI arguments.
 FILES_TO_PLOT = [
-    # "../data/results/k2/n5/n_trials3/results_aer_dynamic.csv",
+    "../data/results/k2/n5/n_trials3/results_aer_dynamic.csv",
     "../data/results/k2/n5/n_trials3/results_ibm.csv",
     "../data/results/k2/n3/n_trials3/results_ibm.csv",
     "../data/results/k2/n5/n_trials3/results_fake.csv",

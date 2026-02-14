@@ -55,8 +55,8 @@ echo "CPUs: $SLURM_CPUS_PER_TASK"
 # i.e., cd scripts && sbatch batch_job.slurm
 
 # Example 1: Run AER with Dynamic Circuits (Standard)
-# echo "Running AER Dynamic..."
-# python3 ../main.py --backend aer --method dynamic --n 5 --k 2 --trials 3 --points 25  --shots 400000 --output ../data/results/k2/n5/n_trials3/results_aer_dynamic.csv
+echo "Running AER Dynamic..."
+python3 ../main.py --backend aer --method dynamic --n 5 --k 2 --trials 3 --points 25  --shots 400000 --output ../data/results/k2/n5/n_trials3/results_aer_dynamic.csv
 
 # Example 2: Run AER with Unrolled Circuits + Pauli Noise (Verification)
 # This verifies that the unrolled logic matches the dynamic logic on the simulator.
@@ -64,8 +64,8 @@ echo "CPUs: $SLURM_CPUS_PER_TASK"
 # python3 ../main.py --backend aer --method unrolled --n 5 --k 2 --trials 3 --points 25 --shots 2000 --n-random 2000 --batch-size 50 --post-only --output ../data/results/k2/n5/n_trials3/results_aer_unrolled.csv
 
 # Example 3: Run Fake Backend (Unrolled)
-echo "Running Fake Backend..."
-python3 -u ../main.py --backend fake --device ibm_boston --method unrolled --n 7 --k 2 --trials 3 --points 5 --shots 400 --n-random 100 --batch-size 25 --post-only --output ../data/results/k2/n7/n_trials3/results_fake.csv
+# echo "Running Fake Backend..."
+# python3 -u ../main.py --backend fake --device ibm_boston --method unrolled --n 7 --k 2 --trials 3 --points 5 --shots 400 --n-random 100 --batch-size 25 --post-only --output ../data/results/k2/n7/n_trials3/results_fake.csv
 
 # Example 4: Run IBM Backend (Post-Only)
 # This submits all jobs to the queue without waiting for results.

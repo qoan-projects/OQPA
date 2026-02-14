@@ -25,26 +25,21 @@ echo "Date: $(date)"
 # Set --points to match the array size + 1 (e.g. 0-24 means 25 points)
 POINTS=25
 
-# Example: Run Fake Backend (Unrolled) with Parallel Lambda
-# We disable internal batching (batch-size -1) since we are parallelizing over lambdas
-# and want to finish this single lambda as fast as possible.
-echo "Running QPA for Task ID: $SLURM_ARRAY_TASK_ID"
+# Example: Run Aer Backend (Dynamic) sharded over lambda points
+echo "Running Aer Dynamic for Task ID: $SLURM_ARRAY_TASK_ID"
 
 python3 ../main.py \
-    --backend fake \
-    --device ibm_marrakesh \
-    --method unrolled \
+    --backend aer \
+    --method dynamic \
     --n 5 \
     --k 2 \
     --trials 3 \
     --points $POINTS \
-    --shots 2000 \
-    --n-random 2000 \
-    --batch-size -1 \
+    --shots 400000 \
     --slurm-task-id $SLURM_ARRAY_TASK_ID \
-    --output ../data/results/array_test/results.csv
+    --output ../data/results/k2/n5/n_trials3/array_aer_dynamic_task_${SLURM_ARRAY_TASK_ID}.csv
 
 echo "Task $SLURM_ARRAY_TASK_ID Complete"
 
-# Note: After all tasks complete, run:
-# python3 scripts/merge_results.py --pattern "../data/results/array_test/results_task*.csv" --output "../data/results/array_test/final_results.csv"
+# Note: After all tasks complete, merge per-task CSVs:
+# python3 scripts/merge_results.py --pattern "../data/results/k2/n5/n_trials3/array_aer_dynamic_task_*.csv" --output "../data/results/k2/n5/n_trials3/results_aer_dynamic_merged.csv"

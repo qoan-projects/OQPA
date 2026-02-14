@@ -28,7 +28,18 @@ class ResultProcessor:
         """
         extracted_counts = []
         
-        for i, pub_res in enumerate(pub_result):
+        # SamplerV2 results are iterable (list of PubResult)
+        # But sometimes it might be a single object if not iterable?
+        # Usually it's a PrimitiveResult which is iterable.
+        
+        # Handle case where pub_result is a list (from some backends or older versions)
+        # or a PrimitiveResult object.
+        try:
+            iterator = iter(pub_result)
+        except TypeError:
+            iterator = [pub_result]
+            
+        for i, pub_res in enumerate(iterator):
             data = pub_res.data
             
             has_anc = hasattr(data, 'anc_meas')
@@ -54,6 +65,20 @@ class ResultProcessor:
                 
             elif has_read:
                 # Dynamic or simple readout
+                # Check if dynamic usually has other registers?
+                # DynamicCircuitBuilder has: res_t0, res_t1... (cr_pool), res_rec, readout
+                # But typically we only care about 'readout' for final fidelity?
+                # Or do we need to check if intermediate measurements were successful?
+                # In DynamicCircuitBuilder, if failure occurs, we don't reach final measure?
+                # Or we do?
+                
+                # If we use get_counts(), it returns a dict of space-separated bitstrings for all registers
+                # if they are not named 'readout' specifically?
+                # No, data.readout.get_counts() only gets 'readout' register.
+                
+                # If we want ALL registers (to check conditions), we might need more.
+                # But process_dynamic_result assumes we just check readout.
+                
                 extracted_counts.append(data.readout.get_counts())
                 
             else:

@@ -20,7 +20,7 @@
 # #SBATCH --job-name=aer_unrolled
 
 # Example 3: Fake Backend
-#SBATCH --job-name=fake_run
+# #SBATCH --job-name=fake_run
 
 # Example 4: IBM Post-Only
 # #SBATCH --job-name=ibm_submit
@@ -32,7 +32,7 @@
 # #SBATCH --job-name=aer_retrieve
 
 # Example 7: Retrieve Fake
-# #SBATCH --job-name=fake_retrieve
+#SBATCH --job-name=fake_retrieve
 # ------------------------------
 
 # Load modules if necessary (adapt to your cluster environment)
@@ -64,8 +64,8 @@ echo "CPUs: $SLURM_CPUS_PER_TASK"
 # python3 ../main.py --backend aer --method unrolled --n 9 --k 2 --trials 3 --points 25 --shots 8000 --n-random 4000 --batch-size 4 --post-only --output ../data/results/k2/n9/n_trials3/results_aer_unrolled.csv
 
 # Example 3: Run Fake Backend (Unrolled)
-echo "Running Fake Backend..."
-python3 -u ../main.py --backend fake --device ibm_boston --method unrolled --n 7 --k 2 --trials 3 --points 5 --shots 8000 --n-random 4000 --batch-size 20 --post-only --output ../data/results/k2/n7/n_trials3/results_fake.csv
+# echo "Running Fake Backend..."
+# python3 -u ../main.py --backend fake --device ibm_boston --method unrolled --n 7 --k 2 --trials 3 --points 5 --shots 8000 --n-random 4000 --batch-size 20 --post-only --output ../data/results/k2/n7/n_trials3/results_fake.csv
 
 # Example 4: Run IBM Backend (Post-Only)
 # This submits all jobs to the queue without waiting for results.
@@ -80,10 +80,10 @@ python3 -u ../main.py --backend fake --device ibm_boston --method unrolled --n 7
 
 # Example 6: Retrieve AER Unrolled Results
 # echo "Retrieving AER results..."
-# python3 ../retrieve_results.py --backend aer --device ibm_brisbane --n 5 --k 2 --trials 3 --output ../data/results/k2/n5/n_trials3/results_aer_unrolled.csv
+# python3 ../retrieve_results.py --backend aer --device aer_unrolled --n 5 --k 2 --trials 3 --output ../data/results/k2/n5/n_trials3/results_aer_unrolled.csv
 
 # Example 7: Retrieve Fake Backend Results
-# echo "Retrieving Fake Backend results..."
-# python3 ../retrieve_results.py --backend fake --device ibm_boston --n 3 --k 2 --trials 3 --output ../data/results/k2/n3/n_trials3/results_fake.csv
+echo "Retrieving Fake Backend results..."
+python3 ../retrieve_results.py --backend fake --device ibm_boston --n 5 --k 2 --trials 3 --output ../data/results/k2/n5/n_trials3/results_fake.csv
 
 echo "Job Complete"

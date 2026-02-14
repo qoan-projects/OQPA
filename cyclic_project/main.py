@@ -104,7 +104,21 @@ def main():
     
     # If backend is aer, device defaults to ibm_brisbane but it is simulated.
     # We should probably respect args.device even for aer if it's set.
-    jobs_dir = os.path.join(project_root, "data", "jobs", args.backend, args.device, param_str, points_str, config_str, timestamp_str)
+    if args.backend == 'aer':
+        if args.device == 'ibm_brisbane':
+            # If user didn't specify a device for AER, decide based on method
+            if method == 'dynamic':
+                device_name = 'aer_dynamic'
+            else:
+                device_name = 'aer_unrolled'
+        else:
+            # If user specified a device, keep it but maybe append method if they want separation
+            # Or trust the user. Let's append method to avoid collision if they use same device name for both.
+            device_name = f"{args.device}_{method}"
+    else:
+        device_name = args.device
+
+    jobs_dir = os.path.join(project_root, "data", "jobs", args.backend, device_name, param_str, points_str, config_str, timestamp_str)
     
     # Ensure directory exists
     os.makedirs(jobs_dir, exist_ok=True)

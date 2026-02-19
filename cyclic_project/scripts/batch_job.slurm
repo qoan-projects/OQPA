@@ -68,7 +68,7 @@ echo "CPUs: $SLURM_CPUS_PER_TASK"
 
 # Example 3: Run Fake Backend (Unrolled)
 echo "Running Fake Backend..."
-python3 -u ../main.py --backend fake --device ibm_boston --method unrolled --n 7 --k 2 --trials 3 --points 8 --shots 8000 --n-random 4000 --batch-size 25 --output ../data/results/k2/n7/n_trials3/results_fake.csv
+python3 -u ../main.py --backend fake --device ibm_boston --method unrolled --n 7 --k 2 --trials 3 --points 8 --shots 1000 --n-random 500 --batch-size 50 --output ../data/results/k2/n7/n_trials3/results_fake_s1000_r500_b50.csv
 
 # Example 4: Run IBM Backend (Post-Only)
 # echo "Submitting IBM Jobs (Post-Only)..."

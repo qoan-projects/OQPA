@@ -79,6 +79,24 @@ def run_simulation_point(epsilon: float, config: SimulationConfig, jobs_dir: str
     global_dynamic_stats = {'success': 0, 'total': 0}
     job_records = []
     
+    # Optimization: Fast Path for Unrolled + PauliTwirling
+    use_fast_path = (config.method == 'unrolled' and config.backend in ['ibm', 'fake', 'aer'] and noise_cls == PauliTwirlingStrategy)
+    
+    transpiled_golden_circuits = []
+    golden_metadata = []
+    golden_circuits = []
+
+    if use_fast_path:
+        # Pre-Transpiling Golden Circuits (Optimization)
+        strategy.set_noise_strategy(None)
+        golden_data = strategy.build(0.0)
+        golden_circuits = [item['circuit'] for item in golden_data]
+        golden_metadata = [{k:v for k,v in item.items() if k!='circuit'} for item in golden_data]
+        
+        transpiled_golden_circuits = transpiler_service.transpile(golden_circuits)
+        if not isinstance(transpiled_golden_circuits, list):
+            transpiled_golden_circuits = [transpiled_golden_circuits]
+
     num_batches = (total_instances + BATCH_SIZE - 1) // BATCH_SIZE
     
     for batch_idx in range(num_batches):
@@ -86,23 +104,74 @@ def run_simulation_point(epsilon: float, config: SimulationConfig, jobs_dir: str
         
         batch_circuits = []
         batch_metadata = []
-        
-        # Build circuits
-        # For parallel mode, we assume SLOW PATH (re-build)
-        submit_opt_level = None
         skip_transpilation = False
         
-        for _ in range(current_batch_size):
-            noise_strategy = noise_cls(config.k)
-            strategy.set_noise_strategy(noise_strategy)
-            circuits_data = strategy.build(epsilon)
+        if use_fast_path:
+            skip_transpilation = True
+            for _ in range(current_batch_size):
+                noise_strategy = noise_cls(config.k)
+                for i, qc_transpiled in enumerate(transpiled_golden_circuits):
+                    qc_instance = qc_transpiled.copy()
+                    # Need original qc to know registers for noise ops
+                    orig_qc = golden_circuits[i]
+                    # Assuming Register names start with R...
+                    data_regs = [reg for reg in orig_qc.qregs if reg.name.startswith("R")]
+                    noise_ops = noise_strategy.generate_noise_ops(data_regs, epsilon)
+                    
+                    # Apply noise ops to transpiled circuit
+                    layout = qc_transpiled.layout.initial_layout if qc_transpiled.layout else None
+                    
+                    for gate, logical_qubit in noise_ops:
+                        target_qubit = None
+                        if layout and logical_qubit in layout:
+                            phys_qubit_idx = layout[logical_qubit]
+                            target_qubit = qc_instance.qubits[phys_qubit_idx]
+                        elif logical_qubit in qc_instance.qubits:
+                            target_qubit = logical_qubit
+                        else:
+                            # Fallback search
+                            for q in qc_instance.qubits:
+                                if hasattr(q, 'register') and hasattr(logical_qubit, 'register'):
+                                        if q.register.name == logical_qubit.register.name and q.index == logical_qubit.index:
+                                            target_qubit = q
+                                            break
+                                elif hasattr(q, '_register') and hasattr(logical_qubit, '_register'):
+                                    if q._register.name == logical_qubit._register.name and q._index == logical_qubit._index:
+                                        target_qubit = q
+                                        break
+                        
+                        if target_qubit:
+                            # Insert gate at beginning
+                            if config.backend in ['ibm', 'fake']:
+                                # Convert Pauli to ISA-safe gates if needed (RZ(pi) for Z, etc)
+                                if gate.name == 'z':
+                                    qc_instance.data.insert(0, CircuitInstruction(RZGate(np.pi), (target_qubit,), ()))
+                                elif gate.name == 'y':
+                                    qc_instance.data.insert(0, CircuitInstruction(RZGate(np.pi), (target_qubit,), ()))
+                                    qc_instance.data.insert(0, CircuitInstruction(XGate(), (target_qubit,), ()))
+                                else:
+                                    qc_instance.data.insert(0, CircuitInstruction(gate, (target_qubit,), ()))
+                            else:
+                                qc_instance.data.insert(0, CircuitInstruction(gate, (target_qubit,), ()))
+                    
+                    batch_circuits.append(qc_instance)
+                    batch_metadata.append(golden_metadata[i])
             
-            for item in circuits_data:
-                batch_circuits.append(item['circuit'])
-                batch_metadata.append(item)
+            transpiled_circuits = batch_circuits
 
-        # Transpile
-        transpiled_circuits = transpiler_service.transpile(batch_circuits, skip=skip_transpilation)
+        else:
+            # SLOW PATH (re-build)
+            for _ in range(current_batch_size):
+                noise_strategy = noise_cls(config.k)
+                strategy.set_noise_strategy(noise_strategy)
+                circuits_data = strategy.build(epsilon)
+                
+                for item in circuits_data:
+                    batch_circuits.append(item['circuit'])
+                    batch_metadata.append(item)
+
+            # Transpile
+            transpiled_circuits = transpiler_service.transpile(batch_circuits)
 
         # Submit Batch
         try:

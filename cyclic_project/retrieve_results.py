@@ -371,11 +371,15 @@ def main():
                      # Compute provisional fidelity for debug
                      temp_fid = 0.0
                      print(f"DEBUG: Batch 1 - Circuits: {len(extracted_counts)}")
-                     for cond_key, stats in batch_stats.items():
-                         path_prob = stats['success'] / stats['total'] if stats['total'] > 0 else 0
-                         temp_fid += path_prob
-                         print(f"DEBUG: Path {cond_key} -> Success: {stats['success']}, Total: {stats['total']}, Prob: {path_prob:.4f}")
-                     print(f"DEBUG: Batch 1 - Batch Fid: {temp_fid:.4f}")
+                     
+                     if method == 'dynamic':
+                         print(f"DEBUG: Dynamic Batch -> Success: {n_succ}, Total: {total_shots}, Fid: {fid:.4f}")
+                     else:
+                         for cond_key, stats in batch_stats.items():
+                             path_prob = stats['success'] / stats['total'] if stats['total'] > 0 else 0
+                             temp_fid += path_prob
+                             print(f"DEBUG: Path {cond_key} -> Success: {stats['success']}, Total: {stats['total']}, Prob: {path_prob:.4f}")
+                         print(f"DEBUG: Batch 1 - Batch Fid: {temp_fid:.4f}")
                 
             except Exception as e:
                 print(f"Failed to retrieve/process job {job_id}: {e}")

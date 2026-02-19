@@ -9,17 +9,25 @@ import itertools
 # --- Configuration ---
 # Add your CSV files here if you prefer not to use CLI arguments.
 FILES_TO_PLOT = [
-    # "../data/results/k2/n5/n_trials3/results_aer_dynamic.csv",
-    # "../data/results/k2/n3/n_trials3/results_aer_dynamic.csv",
-    # "../data/results/k2/n5/n_trials3/results_aer_unrolled.csv",
-    # "../data/results/k2/n3/n_trials3/results_aer_unrolled.csv",
-    "../data/results/k2/n5/n_trials3/results_ibm.csv",
-    "../data/results/k2/n3/n_trials3/results_ibm.csv",
-    "../data/results/k2/n5/n_trials3/results_fake.csv",
-    "../data/results/k2/n3/n_trials3/results_fake.csv",
+    
+    "../data/results/k2/n7/n_trials3/results_aer_dynamic.csv",
+    "../data/results/k2/n7/n_trials3/results_aer_unrolled.csv",
+    "../data/results/k2/n5/n_trials3/results_aer_dynamic.csv",
+    "../data/results/k2/n5/n_trials3/results_aer_unrolled.csv",
+    "../data/results/k2/n3/n_trials3/results_aer_dynamic.csv",
+    "../data/results/k2/n3/n_trials3/results_aer_unrolled.csv",
+    
+
+    
+    
+    # "../data/results/k2/n5/n_trials3/results_ibm.csv",
+    # "../data/results/k2/n5/n_trials3/results_fake.csv",
+    # "../data/results/k2/n3/n_trials3/results_ibm.csv",
+    # "../data/results/k2/n3/n_trials3/results_fake.csv",
 ]
 
-OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/ibm_vs_fake.png"
+OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/compare_dynamic_unrolled.png"
+# OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/ibm_vs_fake.png"
 
 # Style settings
 plt.style.use('seaborn-v0_8-whitegrid')

@@ -38,7 +38,8 @@ class JobManager:
                      metadata: Optional[Dict[str, Any]] = None,
                      dry_run: bool = False,
                      optimization_level: Optional[int] = None,
-                     skip_transpilation: bool = False) -> Dict[str, Any]:
+                     skip_transpilation: bool = False,
+                     save_history: bool = True) -> Dict[str, Any]:
         """
         Submits a batch of circuits to the backend.
         
@@ -50,9 +51,10 @@ class JobManager:
             dry_run (bool): If True, transpiles but does not submit.
             optimization_level (int, optional): Explicit transpilation level. If None, auto-selects.
             skip_transpilation (bool): If True, skips transpilation and submits circuits as-is.
+            save_history (bool): If True, appends to job_history.jsonl. If False, skips this step (useful for parallel execution).
             
         Returns:
-            Dict[str, Any]: A dictionary containing 'job_id', 'status', and optionally 'job_object'.
+            Dict[str, Any]: A dictionary containing 'job_id', 'status', 'job_object', and 'record'.
         """
         print(f"preparing to submit {len(circuits)} circuits...")
         
@@ -131,36 +133,44 @@ class JobManager:
             # This logic is a bit brittle if the path structure changes, but for now:
             # self.output_dir is .../pXX/sXX_cXX/timestamp
             
-            self._save_job_record(job_id, job_tags, metadata, self.history_dir)
-            
-            # Special handling for local backends (Aer/Fake):
+            self._save_job_record(job_id, job_tags, metadata, self.history_dir, save_to_file=save_history)
+        
+        # Return the record info so it can be handled by caller if needed
+        record_info = {
+            "job_id": job_id,
+            "timestamp": pd.Timestamp.now().isoformat(),
+            "tags": job_tags or [],
+            "metadata": metadata or {}
+        }
+        
+        # Special handling for local backends (Aer/Fake):
             # Save the results to disk immediately so they can be "retrieved" later.
             # Even in post-only mode, we execute the simulation locally and save the results.
             if is_sim:
-                try:
-                    result = job.result()
-                    
-                    # Determine method (dynamic/unrolled) from metadata
-                    method = metadata.get('method', 'unrolled') if metadata else 'unrolled'
-                    is_dynamic = (method == 'dynamic')
-                    
-                    # Extract counts using ResultProcessor
-                    extracted_counts = ResultProcessor.extract_counts_from_job_result(result, is_dynamic=is_dynamic)
-                    
-                    # Save to JSON
-                    result_path = os.path.join(self.output_dir, f"{job_id}_result.json")
-                    with open(result_path, 'w') as f:
-                        json.dump(extracted_counts, f)
-                    print(f"Local job results saved to {result_path}")
-                    
-                except Exception as e:
-                    print(f"Warning: Failed to save local job results: {e}")
-            
-            return {"job_id": job_id, "job_object": job}
-            
-        except Exception as e:
-            print(f"Error submitting job: {e}")
-            raise e
+            try:
+                result = job.result()
+                
+                # Determine method (dynamic/unrolled) from metadata
+                method = metadata.get('method', 'unrolled') if metadata else 'unrolled'
+                is_dynamic = (method == 'dynamic')
+                
+                # Extract counts using ResultProcessor
+                extracted_counts = ResultProcessor.extract_counts_from_job_result(result, is_dynamic=is_dynamic)
+                
+                # Save to JSON
+                result_path = os.path.join(self.output_dir, f"{job_id}_result.json")
+                with open(result_path, 'w') as f:
+                    json.dump(extracted_counts, f)
+                print(f"Local job results saved to {result_path}")
+                
+            except Exception as e:
+                print(f"Warning: Failed to save local job results: {e}")
+        
+        return {"job_id": job_id, "job_object": job, "record": record_info}
+        
+    except Exception as e:
+        print(f"Error submitting job: {e}")
+        raise e
 
     def retrieve_result(self, job_id: str) -> PrimitiveResult:
         """
@@ -189,7 +199,7 @@ class JobManager:
         else:
             raise NotImplementedError("Job retrieval by ID is only supported for IBM Runtime backends currently.")
 
-    def _save_job_record(self, job_id: str, tags: List[str], metadata: Dict[str, Any], history_dir: str = None):
+    def _save_job_record(self, job_id: str, tags: List[str], metadata: Dict[str, Any], history_dir: str = None, save_to_file: bool = True):
         """Helper to save job details to a local JSONL file."""
         record = {
             "job_id": job_id,
@@ -198,6 +208,9 @@ class JobManager:
             "metadata": metadata or {}
         }
         
+        if not save_to_file:
+            return
+
         if history_dir is None:
             history_dir = self.output_dir
             

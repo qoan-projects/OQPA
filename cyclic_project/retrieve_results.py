@@ -254,6 +254,15 @@ def main():
                         
                     with open(result_path, 'r') as f:
                         extracted_counts = json.load(f)
+                    
+                    # For AER/Fake, we need to know if it was dynamic or unrolled to process correctly
+                    # Usually, the result JSON structure differs, but extract_counts_from_job_result is not called here
+                    # We loaded raw counts/quasi-dists from JSON.
+                    # ResultProcessor methods expect specific format.
+                    
+                    # If dynamic, extracted_counts is usually a list of dicts (one per pub)
+                    # The ResultProcessor.aggregate_batch_stats needs to know how to interpret keys.
+                    pass
                 
                 else:
                     continue
@@ -269,11 +278,91 @@ def main():
                         total_clbits_list.append(0)
 
                 # Calculate Batch Stats and Accumulate
-                batch_stats = processor.aggregate_batch_stats(extracted_counts, batch_metadata, total_clbits_list)
+                # For dynamic circuits, we have a different aggregation logic
+                method = job_record['metadata'].get('method', 'unrolled')
                 
-                for cond_key, stats in batch_stats.items():
-                    global_path_stats[cond_key]['success'] += stats['success']
-                    global_path_stats[cond_key]['total'] += stats['total']
+                if method == 'dynamic':
+                    # Dynamic: Single circuit result, but split into "paths" logically?
+                    # No, dynamic result is a single distribution.
+                    # process_dynamic_result returns a single fidelity number.
+                    # But here we want to aggregate.
+                    
+                    # For dynamic, we don't have "paths" in the same way.
+                    # We have a single fidelity value per shot? Or per circuit?
+                    # ResultProcessor.process_dynamic_result calculates Fidelity = P(success)
+                    # P(success) = counts(success_state) / total_shots
+                    
+                    # To fit into global_path_stats structure:
+                    # We can treat it as a single "path_dynamic"
+                    # Success = counts(success_state), Total = total_shots
+                    
+                    # We need to parse the counts to find success state
+                    # Success state is when all ancilla measurements are 0?
+                    # Dynamic circuit builder measures final state to 'readout'
+                    # But intermediate failures are handled by if_test.
+                    # If failed, we don't measure final? Or we measure garbage?
+                    
+                    # Wait, dynamic circuit builder:
+                    # If success -> measure reserve to readout
+                    # If fail -> do nothing (so readout is 0?)
+                    # Actually, let's look at process_dynamic_result in ResultProcessor
+                    
+                    # Re-implement logic here to aggregate:
+                    # We need to know which keys correspond to "Success"
+                    # But process_dynamic_result does it all at once.
+                    
+                    # Let's just accumulate the counts directly?
+                    # extracted_counts is [ {counts} ]
+                    
+                    counts = extracted_counts[0]
+                    total_shots = sum(counts.values())
+                    
+                    # We need to identify success keys.
+                    # This depends on ResultProcessor logic.
+                    # Let's instantiate processor to use its helper if possible, or replicate logic.
+                    
+                    # Replicating logic from ResultProcessor.process_dynamic_result for aggregation
+                    # success_key is when all relevant bits are correct.
+                    # But dynamic circuit usually only produces output on success?
+                    # Or it produces output always?
+                    
+                    # In DynamicCircuitBuilder:
+                    # qc.measure(initial_reserve, cr_final) is at the end.
+                    # But it's only reached if recursion completes?
+                    # No, it's sequential. But the recursive layers are conditional.
+                    # If a branch fails, the subsequent code in 'else' or skipped 'if' is not executed.
+                    # So if purification fails, we might not reach the final measurement?
+                    # If we don't reach measure, the classical bits are 0.
+                    
+                    # So '0' could mean "measured 0" OR "didn't measure".
+                    # This is ambiguous if 0 is a valid state.
+                    # But typically we purify to |0...0> + |1...1> (GHZ) or Bell pair.
+                    # If we purify Bell pair |00>+|11>, valid outcomes are 00, 11.
+                    # If we fail, we might get 00 by default?
+                    
+                    # Let's assume ResultProcessor handles this.
+                    # Since we want to aggregate, we can just sum up the counts
+                    # global_dynamic_counts += counts
+                    # And then process at the end?
+                    
+                    # Simpler approach: Calculate fidelity per batch, then average?
+                    # But we want error bars.
+                    # Let's treat "dynamic" as one single path.
+                    
+                    fid = processor.process_dynamic_result(counts, total_clbits_list[0])
+                    # fid is success_prob
+                    n_succ = int(fid * total_shots)
+                    
+                    global_path_stats['dynamic']['success'] += n_succ
+                    global_path_stats['dynamic']['total'] += total_shots
+                    
+                else:
+                    # Unrolled
+                    batch_stats = processor.aggregate_batch_stats(extracted_counts, batch_metadata, total_clbits_list)
+                    
+                    for cond_key, stats in batch_stats.items():
+                        global_path_stats[cond_key]['success'] += stats['success']
+                        global_path_stats[cond_key]['total'] += stats['total']
                 
                 successful_batches += 1
                 
@@ -282,11 +371,15 @@ def main():
                      # Compute provisional fidelity for debug
                      temp_fid = 0.0
                      print(f"DEBUG: Batch 1 - Circuits: {len(extracted_counts)}")
-                     for cond_key, stats in batch_stats.items():
-                         path_prob = stats['success'] / stats['total'] if stats['total'] > 0 else 0
-                         temp_fid += path_prob
-                         print(f"DEBUG: Path {cond_key} -> Success: {stats['success']}, Total: {stats['total']}, Prob: {path_prob:.4f}")
-                     print(f"DEBUG: Batch 1 - Batch Fid: {temp_fid:.4f}")
+                     
+                     if method == 'dynamic':
+                         print(f"DEBUG: Dynamic Batch -> Success: {n_succ}, Total: {total_shots}, Fid: {fid:.4f}")
+                     else:
+                         for cond_key, stats in batch_stats.items():
+                             path_prob = stats['success'] / stats['total'] if stats['total'] > 0 else 0
+                             temp_fid += path_prob
+                             print(f"DEBUG: Path {cond_key} -> Success: {stats['success']}, Total: {stats['total']}, Prob: {path_prob:.4f}")
+                         print(f"DEBUG: Batch 1 - Batch Fid: {temp_fid:.4f}")
                 
             except Exception as e:
                 print(f"Failed to retrieve/process job {job_id}: {e}")

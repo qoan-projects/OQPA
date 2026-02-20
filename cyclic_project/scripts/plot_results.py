@@ -9,14 +9,25 @@ import itertools
 # --- Configuration ---
 # Add your CSV files here if you prefer not to use CLI arguments.
 FILES_TO_PLOT = [
+    
+    # "../data/results/k2/n7/n_trials3/results_aer_dynamic.csv",
+    # "../data/results/k2/n7/n_trials3/results_aer_unrolled.csv",
     # "../data/results/k2/n5/n_trials3/results_aer_dynamic.csv",
+    # "../data/results/k2/n5/n_trials3/results_aer_unrolled.csv",
+    # "../data/results/k2/n3/n_trials3/results_aer_dynamic.csv",
+    # "../data/results/k2/n3/n_trials3/results_aer_unrolled.csv",
+    
+
+    
+    
     "../data/results/k2/n5/n_trials3/results_ibm.csv",
-    "../data/results/k2/n3/n_trials3/results_ibm.csv",
     "../data/results/k2/n5/n_trials3/results_fake.csv",
+    "../data/results/k2/n3/n_trials3/results_ibm.csv",
     "../data/results/k2/n3/n_trials3/results_fake.csv",
 ]
 
-OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/fidelity_plot_withfake.png"
+# OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/compare_dynamic_unrolled.png"
+OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/ibm_vs_fake.png"
 
 # Style settings
 plt.style.use('seaborn-v0_8-whitegrid')
@@ -75,11 +86,17 @@ def get_params_from_path(filepath):
 def get_backend_from_path(filepath):
     """Identify backend from filepath."""
     filepath_lower = filepath.lower()
-    if "ibm" in filepath_lower:
+    if "aer_dynamic" in filepath_lower:
+        return "Aer Dynamic"
+    elif "aer_unrolled" in filepath_lower:
+        return "Aer Unrolled"
+    elif "ibm" in filepath_lower:
         return "IBM"
     elif "fake" in filepath_lower:
         return "Fake"
     elif "aer" in filepath_lower:
+        # Fallback if filename doesn't specify dynamic/unrolled but is aer
+        # Default to Aer Unrolled style usually, or generic Aer
         return "Aer"
     return "Unknown"
 
@@ -151,16 +168,29 @@ def main():
     param_color_map = {param: colors[i] for i, param in enumerate(sorted(list(unique_params)))}
     
     # Marker map for backends
-    markers = ['o', 's', '^', 'D', 'v', '<', '>']
-    backend_marker_map = {backend: markers[i % len(markers)] for i, backend in enumerate(sorted(list(unique_backends)))}
+    # Aer Dynamic: None (line only)
+    # IBM: None (line only) - Requested Change
+    # Others: Distinct markers
+    backend_marker_map = {
+        "Aer Dynamic": None,
+        "Aer Unrolled": 'o', # Circle
+        "IBM": None,         # No Marker (Line only)
+        "Fake": '^',         # Triangle Up
+        "Aer": 'x',
+        "Unknown": 'D'
+    }
     
-    # Linestyle map for backends (optional, maybe keep solid for all but change transparency or dash)
-    # Let's keep solid for data, dashed for theory
+    # Linestyle map for backends
+    # Aer Dynamic: Solid
+    # IBM: Solid - Requested Change
+    # Others: None (Scatter)
     backend_linestyle_map = {
-        "IBM": "-",
-        "Fake": "-.",
-        "Aer": ":",
-        "Unknown": "-"
+        "Aer Dynamic": "-",
+        "Aer Unrolled": "None", # Scatter
+        "IBM": "-",             # Solid Line
+        "Fake": "None",         # Scatter
+        "Aer": "None",
+        "Unknown": "None"
     }
     
     plt.figure(figsize=(12, 8))
@@ -172,13 +202,23 @@ def main():
         backend = entry['backend']
         
         color = param_color_map[(n, k)]
-        marker = backend_marker_map[backend]
-        linestyle = backend_linestyle_map.get(backend, "-")
+        marker = backend_marker_map.get(backend, 'o')
+        linestyle = backend_linestyle_map.get(backend, "None")
         
         label = f"{backend} (N={n}, K={k}, T={t})"
         
         # Check for error column
         if 'error' in df.columns:
+            # If linestyle is None (scatter), we still want error bars
+            # errorbar(fmt='') can control this.
+            # If linestyle is '-', fmt='-'
+            
+            fmt = ''
+            if linestyle != "None":
+                fmt = linestyle
+            # If marker is None, we don't put marker in fmt
+            # But we pass marker=marker anyway.
+            
             plt.errorbar(
                 df['lambda'], 
                 df['fidelity'], 
@@ -212,9 +252,13 @@ def main():
         theory_params.append((args.theory_n2, args.theory_k2))
         
     # Also automatically add theory curves for plotted data if not redundant
-    for (n, k) in unique_params:
-        if (n, k) not in theory_params:
-            theory_params.append((n, k))
+    # ONLY IF --auto-theory is set (or similar flag)
+    # User requested: "theory curves are only plotted if I specifically call for them"
+    # So we should REMOVE the auto-add loop.
+    
+    # for (n, k) in unique_params:
+    #     if (n, k) not in theory_params:
+    #         theory_params.append((n, k))
             
     lam_values = np.linspace(0, 1, 100)
     
@@ -237,8 +281,19 @@ def main():
     plt.ylabel("Purified Fidelity")
     plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
     plt.legend(loc='best', frameon=True, shadow=True)
-    plt.ylim(-0.05, 1.05)
-    plt.xlim(-0.05, 1.05)
+    
+    # Calculate min Y based on theory limits or data
+    # Random guess limit for purification is 1/d = 1/2^k
+    # We want to show from 1 down to slightly below this limit.
+    # Find min K in plotted data
+    min_limit = 0.0
+    if unique_params:
+        max_k = max(p[1] for p in unique_params)
+        random_floor = 1.0 / (2**max_k)
+        min_limit = max(0, random_floor - 0.05) # Little buffer below floor
+    
+    plt.ylim(min_limit, 1.02)
+    plt.xlim(-0.02, 1.02)
     
     # Ensure directory exists for output
     out_dir = os.path.dirname(output_path)

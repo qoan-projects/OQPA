@@ -40,12 +40,19 @@ class UnrolledHybridStrategy:
         # Initial Resources
         qr_data = [QuantumRegister(self.k, f"R{i+1}") for i in range(self.n_registers)]
         
-        # We need a pool of ancillas large enough for the max depth
-        # For safety, allocate new ancillas for each trial to avoid reuse issues in static unrolling
-        ancilla_pool = [QuantumRegister(1, f"anc_{i}") for i in range(self.n_trials * (self.n_registers//2))]
+        # We need a pool of ancillas large enough for the max concurrent tests
+        # In this topology, max concurrent tests is n_registers // 2
+        # We reuse these ancillas by resetting them after measurement.
+        num_concurrent_tests = self.n_registers // 2
+        ancilla_pool = [QuantumRegister(1, f"anc_{i}") for i in range(num_concurrent_tests)]
         
         cr_readout = ClassicalRegister(self.k, "readout")
-        cr_ancillas = ClassicalRegister(len(ancilla_pool), "anc_meas")
+        
+        # We still need distinct classical bits for every measurement in the history
+        # to distinguish paths in post-selection.
+        # Max measurements = n_trials * (n_registers // 2)
+        max_total_measurements = self.n_trials * (self.n_registers // 2)
+        cr_ancillas = ClassicalRegister(max_total_measurements, "anc_meas")
         
         qc_template = QuantumCircuit(*qr_data, *ancilla_pool, cr_readout, cr_ancillas)
         
@@ -78,12 +85,12 @@ class UnrolledHybridStrategy:
 
         # Start Recursion
         self._recurse(qc_template, initial_pairs, reserve, trial=0, 
-                      conditions={}, used_ancillas=0)
+                      conditions={}, total_meas_index=0)
         
         return self.circuits_data
 
     def _recurse(self, current_qc: QuantumCircuit, current_pairs: List[List[int]], 
-                 reserve_idx: int, trial: int, conditions: dict, used_ancillas: int):
+                 reserve_idx: int, trial: int, conditions: dict, total_meas_index: int):
         """
         Recursive helper to traverse the decision tree.
 
@@ -93,7 +100,7 @@ class UnrolledHybridStrategy:
             reserve_idx: Index of the reserve register.
             trial: Current trial depth.
             conditions: Accumulated post-selection conditions.
-            used_ancillas: Count of ancillas used so far.
+            total_meas_index: Index tracker for the classical measurement register (cumulative).
         """
         if trial >= self.n_trials:
             # End of path: Measure reserve and save
@@ -111,9 +118,10 @@ class UnrolledHybridStrategy:
             
             # Apply Schur Tests & Measure Ancillas
             for i, pair in enumerate(current_pairs):
-                anc_idx = used_ancillas + i
-                # Ancillas start after data qubits (n_registers * k)
-                anc_qubit = branch_qc.qubits[self.n_registers*self.k + anc_idx]
+                # Reuse ancilla qubits cyclically or mapped 1-to-1 for this batch
+                # Here we map pair 'i' to ancilla 'i' from the pool
+                # The pool size is guaranteed to be >= num_pairs (since num_pairs <= n_regs//2)
+                anc_qubit = branch_qc.qubits[self.n_registers*self.k + i]
                 
                 # Apply Test Logic (Swap Test)
                 rA_idx, rB_idx = pair
@@ -122,9 +130,12 @@ class UnrolledHybridStrategy:
                 
                 self._apply_schur_test(branch_qc, anc_qubit, rA, rB)
                 
-                # Measure Ancilla
-                cl_idx = self.k + anc_idx 
+                # Measure Ancilla into unique classical bit for history tracking
+                cl_idx = self.k + total_meas_index + i
                 branch_qc.measure(anc_qubit, branch_qc.clbits[cl_idx])
+                
+                # RESET Ancilla for reuse in next trial
+                branch_qc.reset(anc_qubit)
                 
                 # Record Condition
                 branch_conditions[cl_idx] = outcome[i]
@@ -156,7 +167,7 @@ class UnrolledHybridStrategy:
                 new_reserve = new_active[-1]
                 
                 self._recurse(branch_qc, new_pairs, new_reserve, trial + 1, 
-                              branch_conditions, used_ancillas + num_pairs)
+                              branch_conditions, total_meas_index + num_pairs)
 
             else:
                 # C. Death Case (0 survivors)

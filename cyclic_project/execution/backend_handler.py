@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import SamplerV2 as AerSampler
-from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as IBMSampler
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as IBMSampler, Batch
 from qiskit_ibm_runtime.fake_provider import FakeSherbrooke, FakeMarrakesh, FakeBrisbane
 
 # Load environment variables from .env file
@@ -33,6 +33,18 @@ class BackendHandler(ABC):
             backend: Optional backend instance.
         """
         pass
+
+    def open_batch(self, backend=None):
+        """
+        Opens a Batch context manager for the backend.
+        
+        Args:
+            backend: Optional backend instance.
+            
+        Returns:
+            Batch context manager or None if not supported.
+        """
+        return None
 
 class AERHandler(BackendHandler):
     """
@@ -146,6 +158,17 @@ class IBMRuntimeHandler(BackendHandler):
 
     def get_sampler(self, backend=None):
         """Returns an IBMSampler configured for the real backend."""
+        # Check if we are inside a Batch context?
+        # The caller should instantiate Sampler with mode=batch
+        # But here we just return a default sampler if no batch provided.
         if backend is None:
             backend = self.get_backend()
         return IBMSampler(mode=backend)
+
+    def open_batch(self, backend=None):
+        """
+        Opens a Batch context manager for the IBM backend.
+        """
+        if backend is None:
+            backend = self.get_backend()
+        return Batch(backend=backend)

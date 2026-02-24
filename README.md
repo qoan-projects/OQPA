@@ -174,3 +174,11 @@ This directory contains scripts designed for large-scale HPC cluster submissions
 
 Each type of simulation (fake backend, Rydberg, ladder step initialization) has corresponding scripts in both directories to handle different computational requirements and cluster configurations.
 
+
+---
+
+## Test Twirling
+
+- **Location:** `test_twirling/` — contains scripts and helpers for randomized twirling tests used to validate measurement and noise-averaging routines.
+- **Quick run:** from the project root you can run example scripts, e.g.: `python test_twirling/external_loop.py` (adjust arguments as needed for your setup).
+- **Purpose:** these tests exercise twirling protocols and help verify that estimators and batching logic behave under randomized noise samples.

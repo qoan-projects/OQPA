@@ -1,0 +1,31 @@
+import numpy as np
+from qiskit import QuantumCircuit, transpile
+from qiskit.circuit import Parameter
+from qiskit_aer import AerSimulator
+
+theta = Parameter("theta")
+phi   = Parameter("phi")
+lam_u = Parameter("lam_u")
+
+qc = QuantumCircuit(1, 1)
+qc.u(theta, phi, lam_u, 0)
+qc.measure(0, 0)
+
+sim = AerSimulator()
+qc_t = transpile(qc, sim, optimization_level=0)
+
+print("transpiled params:", [p.name for p in qc_t.parameters])
+print("num params:", qc_t.num_parameters)
+
+def run_one(row_angles):
+    # row_angles is length 3: (theta, phi, lam_u)
+    bind = {theta: row_angles[0], phi: row_angles[1], lam_u: row_angles[2]}
+    circ = qc.assign_parameters(bind, inplace=False)
+    circ_t = transpile(circ, sim, optimization_level=0)
+    res = sim.run(circ_t, shots=2000).result()
+    return res.get_counts()
+
+print("I counts:", run_one((0.0, 0.0, 0.0)))
+print("X counts:", run_one((np.pi, 0.0, np.pi)))
+print("Y counts:", run_one((np.pi, np.pi/2, np.pi/2)))
+print("Z counts:", run_one((0.0, 0.0, np.pi)))

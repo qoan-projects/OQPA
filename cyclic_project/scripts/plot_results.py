@@ -10,24 +10,37 @@ import itertools
 # Add your CSV files here if you prefer not to use CLI arguments.
 FILES_TO_PLOT = [
     
-    # "../data/results/k2/n7/n_trials3/results_aer_dynamic.csv",
+    "../data/results/k2/n7/n_trials3/results_aer_dynamic.csv",
     # "../data/results/k2/n7/n_trials3/results_aer_unrolled.csv",
-    # "../data/results/k2/n5/n_trials3/results_aer_dynamic.csv",
+    "../data/results/k2/n5/n_trials3/results_aer_dynamic.csv",
     # "../data/results/k2/n5/n_trials3/results_aer_unrolled.csv",
-    # "../data/results/k2/n3/n_trials3/results_aer_dynamic.csv",
+    "../data/results/k2/n3/n_trials3/results_aer_dynamic.csv",
     # "../data/results/k2/n3/n_trials3/results_aer_unrolled.csv",
     
-
+    # "../data/results/k2/n3/n_trials3/results_fake_unparametrized.csv",
+    # "../data/results/k2/n3/n_trials3/results_fake_param.csv",
+    # "../data/results/k2/n3/n_trials3/results_fake.csv",
+    
+    # "../data/results/k2/n5/n_trials3/results_aer_dynamic.csv",
+    # "../data/results/k2/n5/n_trials3/results_aer_unrolled.csv",
+    # "../data/results/k2/n5/n_trials3/results_aer_unrolled_param.csv",
     
     
-    "../data/results/k2/n5/n_trials3/results_ibm.csv",
-    "../data/results/k2/n5/n_trials3/results_fake.csv",
-    "../data/results/k2/n3/n_trials3/results_ibm.csv",
-    "../data/results/k2/n3/n_trials3/results_fake.csv",
+    # "../data/results/k2/n5/n_trials3/results_ibm.csv",
+    # "../data/results/k2/n5/n_trials3/results_fake.csv",
+    # "../data/results/k2/n3/n_trials3/results_ibm.csv",
+    # "../data/results/k2/n3/n_trials3/results_fake.csv",
+    
+    
+    "../data/results/k2/n3/n_trials3/results_ibm_param_retrieved.csv",
+    "../data/results/k2/n5/n_trials3/results_ibm_param_retrieved.csv",
+    
 ]
 
 # OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/compare_dynamic_unrolled.png"
-OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/ibm_vs_fake.png"
+# OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/ibm_vs_fake.png"
+# OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/parametrized_testing.png"
+OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/ibm_param.png"
 
 # Style settings
 plt.style.use('seaborn-v0_8-whitegrid')
@@ -86,6 +99,14 @@ def get_params_from_path(filepath):
 def get_backend_from_path(filepath):
     """Identify backend from filepath."""
     filepath_lower = filepath.lower()
+    
+    # Fake Parametrized
+    if "fake_param" in filepath_lower:
+        return "Fake Parameterized"
+    elif "fake_unparametrized" in filepath_lower:
+        return "Fake Unparameterized"
+    elif "aer_unrolled_param" in filepath_lower:
+        return "AER Parameterized"
     if "aer_dynamic" in filepath_lower:
         return "Aer Dynamic"
     elif "aer_unrolled" in filepath_lower:
@@ -176,8 +197,12 @@ def main():
         "Aer Unrolled": 'o', # Circle
         "IBM": None,         # No Marker (Line only)
         "Fake": '^',         # Triangle Up
+        "Fake Parameterized": 's', # Square
+        "AER Parameterized": 'x', # Square
+        "Fake Unparameterized": 'o',
         "Aer": 'x',
         "Unknown": 'D'
+        
     }
     
     # Linestyle map for backends
@@ -189,6 +214,9 @@ def main():
         "Aer Unrolled": "None", # Scatter
         "IBM": "-",             # Solid Line
         "Fake": "None",         # Scatter
+        "Fake Parameterized": "None",
+        "AER Parameterized": "None", # Square
+        "Fake Unparameterized": "None",
         "Aer": "None",
         "Unknown": "None"
     }
@@ -201,7 +229,16 @@ def main():
         n, k, t = entry['n'], entry['k'], entry['t']
         backend = entry['backend']
         
+        # Custom color handling
+        # If parameterized, use a darker shade or complementary color?
+        # Or just same color if it's the same (n, k).
+        # User requested: "different colors or different shapes"
+        
         color = param_color_map[(n, k)]
+        
+        # If Fake Parameterized, maybe shift color slightly or keep same but distinct marker (which we did)
+        # Let's keep same color to show it belongs to same N, K group, but distinct marker 's' vs '^'
+        
         marker = backend_marker_map.get(backend, 'o')
         linestyle = backend_linestyle_map.get(backend, "None")
         

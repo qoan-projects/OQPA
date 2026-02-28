@@ -45,11 +45,11 @@ def main():
         # unless we implemented a mock database. Assuming standard Qiskit FakeBackend behavior,
         # we can't really "retrieve" unless the job object is in memory.
         # But if we are simulating this flow, maybe we assume it works or skip.
-        print("Note: Retrieval from 'fake' backend relies on local result files saved by JobManager.")
+        print("Note: Retrieval from 'fake' backend relies on local result files saved by JobService.")
         handler = FakeBackendHandler(args.device)
         service = None # Fake handler doesn't have a service
     elif args.backend == 'aer':
-        print("Note: Retrieval from 'aer' backend relies on local result files saved by JobManager.")
+        print("Note: Retrieval from 'aer' backend relies on local result files saved by JobService.")
         handler = AERHandler()
         service = None
     else:

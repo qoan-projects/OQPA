@@ -17,8 +17,7 @@ cyclic_project/
 │   ├── circuit_factory.py      # Factory for creating strategies
 │   ├── registers.py            # Quantum/Classical register management
 │   ├── noise_models.py         # Noise injection strategies (Depolarizing vs Twirling)
-│   ├── ops.py                  # Quantum operations (gates, measurements)
-│   └── hybrid_topology.py      # Topology mapping helpers
+│   └── ops.py                  # Quantum operations (gates, measurements)
 ├── execution/
 │   ├── runner.py               # Main execution engine
 │   ├── job_service.py          # Job submission and tracking service
@@ -26,8 +25,7 @@ cyclic_project/
 │   └── transpiler_service.py   # Transpilation logic
 ├── analysis/
 │   ├── result_processor.py     # Results extraction and aggregation
-│   ├── fidelity_calc.py        # Fidelity computation logic
-│   └── post_selection.py       # Filtering logic for unrolled circuits
+│   └── fidelity_calc.py        # Fidelity computation logic
 ├── data/
 │   ├── jobs/                   # Job history and results storage
 │   ├── logs/                   # Execution logs

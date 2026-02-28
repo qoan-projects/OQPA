@@ -1,10 +1,10 @@
-# QPA-Experiments: Quantum Purity Amplification
+# QPA Cyclic Project - Modular Architecture
 
-**QPA-Experiments** is a simulation framework for exploring Quantum Purity Amplification (QPA)—a protocol designed to increase the purity of noisy quantum states through iterative entanglement, measurement, and conditional operations. This project provides tools to benchmark QPA performance across diverse noise models and protocol parameters, leveraging the SWAPNET implementation. Simulations are tailored for near-term quantum hardware and hybrid analog-digital platforms, supporting:
-
-- **Qiskit AER Simulators**: Dynamic circuits (`if_test`) with configurable noise models.
-- **IBM Fake Backends**: Static unrolled circuits with Pauli twirling for hardware-like noise.
-- **IBM Real Hardware**: Static unrolled circuits and Pauli twirling for execution on actual quantum devices.
+## Overview
+This project implements the Quantum Purification Algorithm (QPA) using a cyclic method. It provides a modular framework for simulations on:
+- **Qiskit AER Simulators**: Using dynamic circuits (`if_test`) and ideal noise models.
+- **IBM Fake Backends**: Using static unrolled circuits and Pauli twirling.
+- **IBM Real Hardware**: Using static unrolled circuits and Pauli twirling.
 
 ## Directory Structure
 ```

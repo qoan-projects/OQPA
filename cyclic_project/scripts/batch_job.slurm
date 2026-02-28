@@ -50,7 +50,16 @@
 # #SBATCH --job-name=aer_parametrized_submit_new
 
 # Example 13: AER Parametrized Retrieve-Only
-#SBATCH --job-name=aer_parametrized_retrieve_new
+# #SBATCH --job-name=aer_parametrized_retrieve_new
+
+# Example 14: Fake Parametrized No Reset
+# #SBATCH --job-name=fake_parametrized_no_reset
+
+# Example 15: IBM Parametrized No Reset Post-Only
+# #SBATCH --job-name=ibm_parametrized_noreset_submit_new
+
+# Example 16: IBM Parametrized No Reset Retrieve-Only
+# #SBATCH --job-name=ibm_parametrized_noreset_retrieve_new
 # ------------------------------
 
 # Load modules if necessary (adapt to your cluster environment)
@@ -112,13 +121,13 @@ echo "CPUs: $SLURM_CPUS_PER_TASK"
 #               Set this high (e.g. 100-1000) to minimize queue overhead.
 #               If n-random > batch-size, it will be split into multiple jobs.
 # echo "Submitting IBM Parameterized Jobs..."
-# python3 -u ../main.py --backend ibm --device ibm_boston --method parameterized --n 5 --k 2 --trials 3 --lambda-val 0.75 --shots 8000 --n-random 4000 --batch-size 1000 --post-only --no-batchmode --output ../data/results/k2/n5/n_trials3/results_ibm_param.csv
+# python3 -u ../main.py --backend ibm --device ibm_boston --method parameterized --n 3 --k 2 --trials 3 --lambda-val 0.75 --shots 16000 --n-random 8000 --batch-size 4000 --post-only --no-batchmode --output ../data/results/k2/n3/n_trials3/results_ibm_param.csv
 
 # Example 10: Retrieve IBM Parameterized Results
 # Retrieves results for jobs tagged with 'parameterized' from a specific job directory.
 # This is useful for checking the results of the new method specifically.
-# echo "Retrieving IBM Parameterized Results..."
-# python3 -u ../retrieve_results.py --backend ibm --device ibm_boston --n 5 --k 2 --trials 3 --filter-tag parameterized --output ../data/results/k2/n5/n_trials3/results_ibm_param_retrieved.csv
+echo "Retrieving IBM Parameterized Results..."
+python3 -u ../retrieve_results.py --backend ibm --device ibm_boston --n 3 --k 2 --trials 3 --filter-tag parameterized --output ../data/results/k2/n3/n_trials3/results_ibm_param_retrieved.csv
 
 
 # Example 11: Fake Parameterized (New Method)
@@ -128,9 +137,9 @@ echo "CPUs: $SLURM_CPUS_PER_TASK"
 #               Set this high (e.g. 100-1000) to minimize queue overhead.
 #               If n-random > batch-size, it will be split into multiple jobs.
 # echo "Submitting Fake Parameterized Jobs..."
-# python3 -u ../main.py --backend fake --device ibm_boston --method parameterized --n 3 --k 2 --trials 3 --points 8 --shots 8000 --n-random 4000 --batch-size 800 --no-batchmode --output ../data/results/k2/n3/n_trials3/results_fake_param.csv
+# python3 -u ../main.py --backend fake --device ibm_boston --method parameterized --n 5 --k 2 --trials 3 --points 8 --shots 8000 --n-random 4000 --batch-size 800 --no-batchmode --output ../data/results/k2/n5/n_trials3/results_fake_param.csv
 
-# Example 11: AER Parameterized (New Method)
+# Example 12: AER Parameterized (New Method)
 # This uses the new efficient PUB-based submission.
 # --n-random: Total number of Pauli twirling instances to run.
 # --batch-size: How many instances to pack into a SINGLE job (one PUB).
@@ -139,12 +148,36 @@ echo "CPUs: $SLURM_CPUS_PER_TASK"
 # echo "Submitting AER Parameterized Jobs..."
 # python3 -u ../main.py --backend aer --method parameterized --n 5 --k 2 --trials 3 --points 25 --shots 8000 --n-random 4000 --batch-size 2000 --no-batchmode --output ../data/results/k2/n5/n_trials3/results_aer_unrolled_param.csv
 
-# Example 12: Retrieve AER Parameterized Results
+# Example 13: Retrieve AER Parameterized Results
 # Retrieves results for jobs tagged with 'parameterized' from a specific job directory.
 # This is useful for checking the results of the new method specifically.
-echo "Retrieving AER Parameterized Results..."
-python3 -u ../retrieve_results.py --backend aer --device aer_unrolled --n 5 --k 2 --trials 3 --filter-tag parameterized --output ../data/results/k2/n5/n_trials3/results_aer_unrolled_param_retrieved.csv
+# echo "Retrieving AER Parameterized Results..."
+# python3 -u ../retrieve_results.py --backend aer --device aer_unrolled --n 5 --k 2 --trials 3 --filter-tag parameterized --output ../data/results/k2/n5/n_trials3/results_aer_unrolled_param_retrieved.csv
 
+# Example 14: Fake Parameterized without resets (New Method)
+# This uses the new efficient PUB-based submission.
+# --n-random: Total number of Pauli twirling instances to run.
+# --batch-size: How many instances to pack into a SINGLE job (one PUB).
+#               Set this high (e.g. 100-1000) to minimize queue overhead.
+#               If n-random > batch-size, it will be split into multiple jobs.
+# echo "Submitting Fake Parameterized Jobs..."
+# python3 -u ../main.py --backend fake --device ibm_boston --method parameterized --n 5 --k 2 --trials 3 --points 8 --shots 8000 --n-random 4000 --batch-size 2000 --no-batchmode --no-reset --output ../data/results/k2/n5/n_trials3/results_fake_param_no_resets.csv
+
+# Example 15: IBM Parameterized No Reset (New Method)
+# This uses the new efficient PUB-based submission.
+# --n-random: Total number of Pauli twirling instances to run.
+# --batch-size: How many instances to pack into a SINGLE job (one PUB).
+#               Set this high (e.g. 100-1000) to minimize queue overhead.
+#               If n-random > batch-size, it will be split into multiple jobs.
+# echo "Submitting IBM Parameterized No Reset Jobs..."
+# python3 -u ../main.py --backend ibm --device ibm_boston --method parameterized --n 3 --k 2 --trials 3 --lambda-val 0.75 --shots 24000 --n-random 12000 --batch-size 4000 --post-only --no-reset --no-batchmode --output ../data/results/k2/n3/n_trials3/results_ibm_param.csv
+
+
+# Example 16: Retrieve IBM Parameterized No Reset Results
+# Retrieves results for jobs tagged with 'parameterized' from a specific job directory.
+# This is useful for checking the results of the new method specifically.
+# echo "Retrieving IBM Parameterized Results..."
+# python3 -u ../retrieve_results.py --backend ibm --device ibm_boston --n 3 --k 2 --trials 3 --filter-tag parameterized --no-reset --output ../data/results/k2/n3/n_trials3/results_ibm_param_retrieved_no_reset.csv
 
 
 echo "Job Complete"

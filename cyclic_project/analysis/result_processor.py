@@ -10,9 +10,93 @@ class ResultProcessor:
         self.k = k
 
     @staticmethod
+    def extract_counts_from_pub_result(pub_result) -> List[Dict[str, int]]:
+        """
+        Extracts measurement counts from a single PUB result (which may contain multiple parameter sets).
+        Returns a list of dictionaries, one per parameter set.
+        """
+        data = pub_result.data
+        
+        # Check for anc_meas and readout (Standard Unrolled QPA structure)
+        has_anc = hasattr(data, 'anc_meas')
+        has_read = hasattr(data, 'readout')
+        
+        if has_anc and has_read:
+            # We need to merge them to preserve correlation
+            anc_bits = data.anc_meas.get_bitstrings()
+            read_bits = data.readout.get_bitstrings()
+            
+            # Case 1: Single binding (or aggregated) -> flat list of strings
+            # NOTE: If we get a single list of strings, it means there was only one PUB or binding, OR
+            # get_bitstrings() already flattened it (unlikely for PrimitiveResult).
+            # But let's check the type of the first element.
+            if isinstance(anc_bits, list) and len(anc_bits) > 0 and isinstance(anc_bits[0], str):
+                 merged = [a + r for a, r in zip(anc_bits, read_bits)]
+                 return [dict(Counter(merged))]
+                 
+            # Case 1b: Empty list
+            if isinstance(anc_bits, list) and len(anc_bits) == 0:
+                 return [{}]
+
+            # Case 2: Multiple bindings -> list of lists
+            # The first element is a LIST of strings.
+            if isinstance(anc_bits, list) and len(anc_bits) > 0 and isinstance(anc_bits[0], list):
+                result_list = []
+                for a_sub, r_sub in zip(anc_bits, read_bits):
+                    merged = [a + r for a, r in zip(a_sub, r_sub)]
+                    result_list.append(dict(Counter(merged)))
+                return result_list
+                
+            # Fallback for weird cases (e.g. numpy arrays or other containers)
+            # Try to iterate and see? Or just assume flat.
+            # If anc_bits is numpy array, list(anc_bits) works.
+            try:
+                # If it's a list of lists (but failed instance check above?)
+                if len(anc_bits) > 0 and hasattr(anc_bits[0], '__iter__') and not isinstance(anc_bits[0], str):
+                    result_list = []
+                    for a_sub, r_sub in zip(anc_bits, read_bits):
+                        merged = [a + r for a, r in zip(a_sub, r_sub)]
+                        result_list.append(dict(Counter(merged)))
+                    return result_list
+            except:
+                pass
+
+            # Fallback: assume it is flat list of strings
+            merged = [a + r for a, r in zip(anc_bits, read_bits)]
+            return [dict(Counter(merged))]
+
+        # Fallback to existing logic (single register)
+        bit_array = None
+        if hasattr(data, 'readout'):
+            bit_array = data.readout
+        elif hasattr(data, 'meas'):
+            bit_array = data.meas
+        elif hasattr(data, 'c'):
+            bit_array = data.c
+        else:
+            # Try to find any BitArray
+            for attr in dir(data):
+                if not attr.startswith('_'):
+                    val = getattr(data, attr)
+                    if hasattr(val, 'get_counts'):
+                        bit_array = val
+                        break
+        
+        if bit_array is not None and hasattr(bit_array, 'get_counts'):
+            # get_counts() returns a list of dicts if there are multiple parameter sets
+            # or a single dict if only one
+            counts = bit_array.get_counts()
+            if isinstance(counts, dict):
+                return [counts]
+            return list(counts)
+            
+        return [{}]
+
+    @staticmethod
     def extract_counts_from_job_result(pub_result, is_dynamic: bool = False) -> List[Dict[str, int]]:
         """
         Extracts measurement counts from a SamplerV2 PrimitiveResult.
+        Handles both single (Unrolled/Dynamic) and multiple (Parameterized) binding sets.
         """
         extracted_counts = []
         
@@ -23,43 +107,22 @@ class ResultProcessor:
             iterator = [pub_result]
             
         for i, pub_res in enumerate(iterator):
-            data = pub_res.data
+            # Delegate to extract_counts_from_pub_result to handle all cases (Standard vs Parameterized)
+            # This handles the anc_meas + readout merging and nested lists correctly.
+            counts_list = ResultProcessor.extract_counts_from_pub_result(pub_res)
             
-            # Check for specific register names
-            has_anc = hasattr(data, 'anc_meas')
-            has_read = hasattr(data, 'readout')
-            
-            if not is_dynamic and has_anc and has_read:
-                # Unrolled: Merge 'anc_meas' (MSB) and 'readout' (LSB)
-                if data.anc_meas.num_bits == 0:
-                    read_strs = data.readout.get_bitstrings()
-                    extracted_counts.append(dict(Counter(read_strs)))
-                else:
-                    anc_strs = data.anc_meas.get_bitstrings()
-                    read_strs = data.readout.get_bitstrings()
-                    merged = [a + r for a, r in zip(anc_strs, read_strs)]
-                    extracted_counts.append(dict(Counter(merged)))
-                
-            elif hasattr(data, 'meas'): 
-                # Fallback: if measure_all() was used
-                extracted_counts.append(data.meas.get_counts())
-                
-            elif has_read:
-                # Dynamic or simple readout
-                extracted_counts.append(data.readout.get_counts())
-                
+            if not counts_list:
+                extracted_counts.append({})
+            elif len(counts_list) == 1:
+                # Standard case: Single dictionary
+                extracted_counts.append(counts_list[0])
             else:
-                # Fallback: try to find any BitArray
-                found = False
-                for attr in dir(data):
-                    if not attr.startswith('_'):
-                        val = getattr(data, attr)
-                        if hasattr(val, 'get_counts'):
-                            extracted_counts.append(val.get_counts())
-                            found = True
-                            break
-                if not found:
-                    extracted_counts.append({})
+                # Parameterized case: List of dictionaries
+                # But extract_counts_from_job_result is expected to return a list where each element
+                # corresponds to a PUB result.
+                # If we append a list here, extracted_counts becomes List[Union[Dict, List[Dict]]]
+                # The caller (retrieve_results.py) handles this structure in the parameterized block.
+                extracted_counts.append(counts_list)
 
         return extracted_counts
 

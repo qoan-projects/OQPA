@@ -10,15 +10,18 @@ import itertools
 # Add your CSV files here if you prefer not to use CLI arguments.
 FILES_TO_PLOT = [
     
-    "../data/results/k2/n7/n_trials3/results_aer_dynamic.csv",
+    # "../data/results/k2/n7/n_trials3/results_aer_dynamic.csv",
     # "../data/results/k2/n7/n_trials3/results_aer_unrolled.csv",
-    "../data/results/k2/n5/n_trials3/results_aer_dynamic.csv",
+    
+    # "../data/results/k2/n5/n_trials3/results_aer_dynamic.csv",
     # "../data/results/k2/n5/n_trials3/results_aer_unrolled.csv",
-    "../data/results/k2/n3/n_trials3/results_aer_dynamic.csv",
+    
+    # "../data/results/k2/n3/n_trials3/results_aer_dynamic.csv",
     # "../data/results/k2/n3/n_trials3/results_aer_unrolled.csv",
     
     # "../data/results/k2/n3/n_trials3/results_fake_unparametrized.csv",
-    # "../data/results/k2/n3/n_trials3/results_fake_param.csv",
+    # "../data/results/k2/n3/n_trials3/results_fake.csv",
+    # "../data/results/k2/n5/n_trials3/results_fake.csv",
     # "../data/results/k2/n3/n_trials3/results_fake.csv",
     
     # "../data/results/k2/n5/n_trials3/results_aer_dynamic.csv",
@@ -27,20 +30,34 @@ FILES_TO_PLOT = [
     
     
     # "../data/results/k2/n5/n_trials3/results_ibm.csv",
+    "../data/results/k2/n3/n_trials3/results_ibm.csv",
+    
     # "../data/results/k2/n5/n_trials3/results_fake.csv",
-    # "../data/results/k2/n3/n_trials3/results_ibm.csv",
     # "../data/results/k2/n3/n_trials3/results_fake.csv",
+
+    # "../data/results/k2/n3/n_trials3/results_ibm_param_retrieved.csv",
+    # "../data/results/k2/n5/n_trials3/results_ibm_param_retrieved.csv",
+    
+    # "../data/results/k2/n3/n_trials3/results_aer_unrolled_param_no_resets.csv",
+    # "../data/results/k2/n5/n_trials3/results_aer_unrolled_param_no_resets.csv",
+    # "../data/results/k2/n3/n_trials3/results_fake_param_no_resets.csv",
+    # "../data/results/k2/n5/n_trials3/results_fake_param_no_resets.csv",
     
     
     "../data/results/k2/n3/n_trials3/results_ibm_param_retrieved.csv",
-    "../data/results/k2/n5/n_trials3/results_ibm_param_retrieved.csv",
+    "../data/results/k2/n3/n_trials3/results_ibm_param_retrieved_no_reset.csv",
+    
+    
+    
     
 ]
 
 # OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/compare_dynamic_unrolled.png"
 # OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/ibm_vs_fake.png"
 # OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/parametrized_testing.png"
-OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/ibm_param.png"
+# OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/ibm_param.png"
+OUTPUT_FILE = "../data/plots/k2/multiple_n/n_trials3/no_resets_testing.png"
+
 
 # Style settings
 plt.style.use('seaborn-v0_8-whitegrid')
@@ -107,7 +124,11 @@ def get_backend_from_path(filepath):
         return "Fake Unparameterized"
     elif "aer_unrolled_param" in filepath_lower:
         return "AER Parameterized"
-    if "aer_dynamic" in filepath_lower:
+    elif "ibm_param" in filepath_lower:
+        if "no_reset" in filepath_lower:
+            return "IBM Parameterized No Reset"
+        return "IBM Parameterized"
+    elif "aer_dynamic" in filepath_lower:
         return "Aer Dynamic"
     elif "aer_unrolled" in filepath_lower:
         return "Aer Unrolled"
@@ -196,6 +217,8 @@ def main():
         "Aer Dynamic": None,
         "Aer Unrolled": 'o', # Circle
         "IBM": None,         # No Marker (Line only)
+        "IBM Parameterized": "s",
+        "IBM Parameterized No Reset": "D", # Diamond
         "Fake": '^',         # Triangle Up
         "Fake Parameterized": 's', # Square
         "AER Parameterized": 'x', # Square
@@ -210,9 +233,11 @@ def main():
     # IBM: Solid - Requested Change
     # Others: None (Scatter)
     backend_linestyle_map = {
-        "Aer Dynamic": "-",
+        "Aer Dynamic": "--",
         "Aer Unrolled": "None", # Scatter
         "IBM": "-",             # Solid Line
+        "IBM Parameterized": "None",
+        "IBM Parameterized No Reset": "None",
         "Fake": "None",         # Scatter
         "Fake Parameterized": "None",
         "AER Parameterized": "None", # Square

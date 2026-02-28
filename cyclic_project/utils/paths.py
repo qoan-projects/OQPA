@@ -22,23 +22,36 @@ class PathManager:
                           points: int, 
                           shots: int, 
                           n_random: int,
-                          timestamp: Optional[str] = None) -> str:
+                          timestamp: Optional[str] = None,
+                          lambda_val: Optional[float] = None,
+                          no_reset: bool = False) -> str:
         """
         Constructs the hierarchical job directory.
         
         Structure:
-        data/jobs/<backend>/<device>/n<N>_k<K>_t<Trials>/p<Points>/s<Shots>_c<Random>/<timestamp>
+        data/jobs/<backend>/<device>/[no_reset]/n<N>_k<K>_t<Trials>/p<Points>/s<Shots>_c<Random>/<timestamp>
+        OR (if lambda_val is set)
+        data/jobs/<backend>/<device>/[no_reset]/n<N>_k<K>_t<Trials>/l<Lambda>/s<Shots>_c<Random>/<timestamp>
         """
         root = PathManager.get_project_root()
         
         param_str = f"n{n}_k{k}_t{trials}"
-        points_str = f"p{points}"
+        
+        if lambda_val is not None:
+            points_str = f"l{lambda_val}"
+        else:
+            points_str = f"p{points}"
+             
         config_str = f"s{shots}_c{n_random}"
         
         if timestamp is None:
             timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+        
+        if no_reset:
+            path = os.path.join(root, "data", "jobs", backend, device, "no_reset", param_str, points_str, config_str, timestamp)
+        else:
+            path = os.path.join(root, "data", "jobs", backend, device, param_str, points_str, config_str, timestamp)
             
-        path = os.path.join(root, "data", "jobs", backend, device, param_str, points_str, config_str, timestamp)
         return path
 
     @staticmethod
@@ -50,7 +63,8 @@ class PathManager:
         try:
             parent_dir = os.path.dirname(job_dir) # .../sXX_cXX
             history_dir = os.path.dirname(parent_dir) # .../pXX
-            if not os.path.basename(history_dir).startswith('p'):
+            dirname = os.path.basename(history_dir)
+            if not (dirname.startswith('p') or dirname.startswith('l')):
                 return job_dir
             return history_dir
         except:

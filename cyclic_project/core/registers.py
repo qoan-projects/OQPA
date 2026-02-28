@@ -6,10 +6,11 @@ class QPARegisters:
     Manages the quantum and classical registers for the QPA protocol.
     Provides abstraction over direct index manipulation.
     """
-    def __init__(self, n_registers: int, k: int, n_trials: int, use_ancilla_pool: bool = False):
+    def __init__(self, n_registers: int, k: int, n_trials: int, use_ancilla_pool: bool = False, no_reset: bool = False):
         self.n = n_registers
         self.k = k
         self.n_trials = n_trials
+        self.no_reset = no_reset
         
         # Data Registers
         self.qr_data = [QuantumRegister(k, f"R{i+1}") for i in range(n_registers)]
@@ -24,7 +25,16 @@ class QPARegisters:
         if use_ancilla_pool:
             # For Unrolled: Pool of ancillas reused
             num_concurrent_tests = n_registers // 2
-            self.qr_ancilla = [QuantumRegister(1, f"anc_{i}") for i in range(num_concurrent_tests)]
+            
+            if no_reset:
+                # If no_reset, we need separate ancillas for each trial
+                # Total ancillas = num_concurrent_tests * n_trials
+                total_ancillas = num_concurrent_tests * n_trials
+                self.qr_ancilla = [QuantumRegister(1, f"anc_{i}") for i in range(total_ancillas)]
+            else:
+                # If reset, we reuse the same set of ancillas
+                self.qr_ancilla = [QuantumRegister(1, f"anc_{i}") for i in range(num_concurrent_tests)]
+                
             max_total_measurements = n_trials * (n_registers // 2)
             self.cr_ancilla = ClassicalRegister(max_total_measurements, "anc_meas")
         else:

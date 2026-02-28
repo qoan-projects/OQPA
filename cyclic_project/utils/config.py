@@ -14,14 +14,17 @@ class SimulationConfig:
     lambda_min: float
     lambda_max: float
     points: int
+    lambda_val: Optional[float]
     n_random: int
     shots: int
     dry_run: bool
     post_only: bool
+    no_batchmode: bool
     output: str
     batch_size: int
     slurm_task_id: Optional[int]
     slurm_num_tasks: Optional[int]
+    no_reset: bool
     
     # Derived/Computed fields
     device_name: str = field(init=False)
@@ -44,7 +47,7 @@ def parse_arguments() -> SimulationConfig:
     parser.add_argument('--backend', type=str, choices=['aer', 'fake', 'ibm'], default='aer', help="Target backend type")
     parser.add_argument('--device', type=str, default='ibm_brisbane', help="Specific device name (for fake/ibm)")
     
-    parser.add_argument('--method', type=str, choices=['dynamic', 'unrolled', 'auto'], default='auto', 
+    parser.add_argument('--method', type=str, choices=['dynamic', 'unrolled', 'parameterized', 'auto'], default='auto', 
                         help="Circuit generation method. 'auto' chooses based on backend.")
 
     # QPA Parameters
@@ -56,18 +59,23 @@ def parse_arguments() -> SimulationConfig:
     parser.add_argument('--lambda-min', type=float, default=0.0, help="Min noise")
     parser.add_argument('--lambda-max', type=float, default=1.0, help="Max noise")
     parser.add_argument('--points', type=int, default=5, help="Number of lambda points")
+    parser.add_argument('--lambda-val', type=float, default=None, help="Single lambda value to run (overrides min/max/points)")
     parser.add_argument('--n-random', type=int, default=1, help="Number of random Pauli instances per circuit")
     
     # Execution
     parser.add_argument('--shots', type=int, default=10000, help="Shots per circuit")
     parser.add_argument('--dry-run', action='store_true', help="Do not submit jobs")
     parser.add_argument('--post-only', action='store_true', help="Submit jobs to IBM and exit (do not wait for results)")
+    parser.add_argument('--no-batchmode', action='store_true', help="Disable IBM Batch execution mode (submit as individual jobs)")
     parser.add_argument('--output', type=str, default='results.csv', help="Output CSV file")
     
     # Advanced Execution Control
     parser.add_argument('--batch-size', type=int, default=50, help="Batch size for submission. -1 for all at once.")
     parser.add_argument('--slurm-task-id', type=int, default=None, help="SLURM array task ID (0-based) to select a single lambda.")
     parser.add_argument('--slurm-num-tasks', type=int, default=None, help="Total number of SLURM tasks (for validation).")
+    
+    # New Experimental Flags
+    parser.add_argument('--no-reset', action='store_true', help="Disable qubit reset and use fresh ancillas for each trial step.")
     
     args = parser.parse_args()
 
@@ -90,12 +98,15 @@ def parse_arguments() -> SimulationConfig:
         lambda_min=args.lambda_min,
         lambda_max=args.lambda_max,
         points=args.points,
+        lambda_val=args.lambda_val,
         n_random=args.n_random,
         shots=args.shots,
         dry_run=args.dry_run,
         post_only=args.post_only,
+        no_batchmode=args.no_batchmode,
         output=args.output,
         batch_size=args.batch_size,
         slurm_task_id=args.slurm_task_id,
-        slurm_num_tasks=args.slurm_num_tasks
+        slurm_num_tasks=args.slurm_num_tasks,
+        no_reset=args.no_reset
     )

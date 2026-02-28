@@ -9,14 +9,21 @@ class UnrolledStrategy(CircuitGenerationStrategy):
     """
     Builds a set of static circuits representing all execution paths.
     """
+    def __init__(self, k: int, n_trials: int, n_registers: int, no_reset: bool = False):
+        super().__init__(k, n_trials, n_registers)
+        self.no_reset = no_reset
+
     def build(self, epsilon: float) -> List[Dict[str, Any]]:
         self.circuits_data = []
         
-        regs = QPARegisters(self.n_registers, self.k, self.n_trials, use_ancilla_pool=True)
+        regs = QPARegisters(self.n_registers, self.k, self.n_trials, use_ancilla_pool=True, no_reset=self.no_reset)
         qc_template = QuantumCircuit(*regs.get_circuit_registers())
         
         # Apply Initial Noise
-        if self.noise_strategy and epsilon > 0:
+        # Note: We do NOT check for epsilon > 0 here because Parameterized strategies
+        # need to build the circuit structure (insert parameters) even if epsilon=0.
+        # Standard strategies handle epsilon <= 0 internally.
+        if self.noise_strategy:
             self.noise_strategy.apply_noise(qc_template, regs.qr_data, epsilon)
 
         # Initial State: Pairs + Reserve
@@ -60,9 +67,15 @@ class UnrolledStrategy(CircuitGenerationStrategy):
             
             for i, pair in enumerate(current_pairs):
                 # Reuse ancilla qubits from pool
-
-
-                anc_qubit = regs.qr_ancilla[i]
+                
+                if self.no_reset:
+                    # Use unique ancilla for each trial step
+                    num_concurrent = self.n_registers // 2
+                    anc_idx = trial * num_concurrent + i
+                    anc_qubit = regs.qr_ancilla[anc_idx]
+                else:
+                    # Reuse same ancillas with reset
+                    anc_qubit = regs.qr_ancilla[i]
                 
                 rA_idx, rB_idx = pair
                 rA = branch_qc.qubits[rA_idx*self.k : (rA_idx+1)*self.k]
@@ -72,7 +85,9 @@ class UnrolledStrategy(CircuitGenerationStrategy):
                 
                 cl_idx = total_meas_index + i
                 branch_qc.measure(anc_qubit, regs.cr_ancilla[cl_idx])
-                branch_qc.reset(anc_qubit) # Reset is already present here!
+                
+                if not self.no_reset:
+                    branch_qc.reset(anc_qubit) # Reset is already present here!
                 
                 # Shift condition key by k because ResultProcessor maps 0..k-1 to readout
                 branch_conditions[self.k + cl_idx] = outcome[i]

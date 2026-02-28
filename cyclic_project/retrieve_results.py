@@ -32,6 +32,7 @@ def main():
     parser.add_argument('--output', type=str, default='retrieved_results.csv', help="Output CSV file")
     parser.add_argument('--filter-tag', type=str, help="Filter jobs by a specific tag (e.g. 'n5')")
     parser.add_argument('--filter-date', type=str, help="Filter jobs from this date (YYYY-MM-DD)")
+    parser.add_argument('--no-reset', action='store_true', help="Retrieve jobs from the 'no_reset' subfolder")
     
     args = parser.parse_args()
     
@@ -61,7 +62,11 @@ def main():
          # Walk through subdirectories to find all job_history.jsonl files
          project_root = os.path.dirname(os.path.abspath(__file__))
          param_str = f"n{args.n}_k{args.k}_t{args.trials}"
-         base_jobs_dir = os.path.join(project_root, "data", "jobs", args.backend, args.device, param_str)
+         
+         if args.no_reset:
+             base_jobs_dir = os.path.join(project_root, "data", "jobs", args.backend, args.device, "no_reset", param_str)
+         else:
+             base_jobs_dir = os.path.join(project_root, "data", "jobs", args.backend, args.device, param_str)
          
          if not os.path.exists(base_jobs_dir):
              print(f"Directory not found: {base_jobs_dir}")
@@ -120,7 +125,10 @@ def main():
         all_jobs = load_job_history(history_file)
         # Add source dir
         for job in all_jobs:
-            job['_source_dir'] = args.job_dir
+            if 'subdir' in job:
+                job['_source_dir'] = os.path.join(args.job_dir, job['subdir'])
+            else:
+                job['_source_dir'] = args.job_dir
             
         print(f"Loaded {len(all_jobs)} jobs from history.")
     
@@ -144,7 +152,15 @@ def main():
     # We group by epsilon to aggregate batches
     experiments = defaultdict(list)
     for job in filtered_jobs:
-        eps = job['metadata'].get('epsilon')
+        meta = job.get('metadata', {})
+        eps = meta.get('epsilon')
+        
+        # If not found, check pubs_metadata (Parameterized style)
+        if eps is None and 'pubs_metadata' in meta:
+            pubs_meta = meta['pubs_metadata']
+            if isinstance(pubs_meta, list) and len(pubs_meta) > 0:
+                eps = pubs_meta[0].get('epsilon')
+                
         if eps is not None:
             experiments[eps].append(job)
             
@@ -163,7 +179,7 @@ def main():
         # Final = sum / total_instances
         
         aggregated_fidelity_sum = 0.0
-        total_circuits_accumulated = 0
+        total_randomizations_accumulated = 0
         k_val = 2 # Default
         
         # New Accumulator for Global Stats over all batches
@@ -174,14 +190,23 @@ def main():
         num_paths_per_instance = 1 # Default for dynamic
         
         if job_list:
-            first_meta = job_list[0]['metadata']
-            k_val = first_meta.get('k', 2)
+            first_job = job_list[0]
+            first_meta = first_job['metadata']
+            
+            # Handle nested pubs_metadata
+            if 'pubs_metadata' in first_meta:
+                # Use the first element of the list as representative metadata
+                first_meta_content = first_meta['pubs_metadata'][0]
+            else:
+                first_meta_content = first_meta
+                
+            k_val = first_meta_content.get('k', 2)
             
             # Determine paths per instance for unrolled
             # Load the circuit metadata from the first job
-            first_job_id = job_list[0]['job_id']
+            first_job_id = first_job['job_id']
             # Use source dir from the job record
-            source_dir = job_list[0].get('_source_dir', args.job_dir)
+            source_dir = first_job.get('_source_dir', args.job_dir)
             
             meta_path = os.path.join(source_dir, f"{first_job_id}_circuit_meta.json")
             if os.path.exists(meta_path):
@@ -226,6 +251,16 @@ def main():
                 
             with open(meta_path, 'r') as f:
                 batch_metadata = json.load(f)
+            
+            # Update randomizations count
+            # Each metadata entry corresponds to a circuit. 
+            # If we have P paths, we have P circuits per randomization instance (if unrolled fully).
+            # So randomizations = len(batch_metadata) / num_paths_per_instance
+            if not (batch_metadata and batch_metadata[0].get('type') == 'parameterized_unrolled'):
+                if num_paths_per_instance > 0:
+                    total_randomizations_accumulated += len(batch_metadata) / num_paths_per_instance
+                else:
+                    total_randomizations_accumulated += len(batch_metadata)
                 
             # Fix JSON integer keys (they become strings after reload)
             for item in batch_metadata:
@@ -241,7 +276,16 @@ def main():
                     pub_result = qiskit_job.result()
                     
                     # Use ResultProcessor to extract counts
-                    method = job_record['metadata'].get('method', 'unrolled')
+                    # Determine method
+                    meta = job_record.get('metadata', {})
+                    if 'pubs_metadata' in meta:
+                        method = 'parameterized' # Implicitly
+                        # Or check inside
+                        if meta['pubs_metadata']:
+                             method = meta['pubs_metadata'][0].get('type', 'parameterized').split('_')[0]
+                    else:
+                        method = meta.get('method', 'unrolled')
+                        
                     is_dynamic = (method == 'dynamic')
                     extracted_counts = ResultProcessor.extract_counts_from_job_result(pub_result, is_dynamic=is_dynamic)
                     
@@ -270,16 +314,80 @@ def main():
                 # Prepare total_clbits_list for processing
                 # Estimate total bits from the first key in each count dictionary
                 total_clbits_list = []
-                for counts in extracted_counts:
-                    if counts:
-                        first_key = next(iter(counts))
-                        total_clbits_list.append(len(first_key.replace(" ", "")))
-                    else:
-                        total_clbits_list.append(0)
+                
+                # Check for Parameterized Unrolled
+                is_parameterized = False
+                if batch_metadata and batch_metadata[0].get('type') == 'parameterized_unrolled':
+                    is_parameterized = True
+                    
+                    # Update Randomizations
+                    # Sum num_randomizations from all paths in this job
+                    # Note: For parameterized, each path entry in metadata has 'num_randomizations'.
+                    # This number is M (randomizations per path).
+                    # Since all paths in a job share the same randomizations (or same number),
+                    # we should take the max or just one of them?
+                    # No, total_randomizations_accumulated represents the total number of "Monte Carlo samples"
+                    # used for the final fidelity average.
+                    # In standard unrolled: we sum "randomization instances".
+                    # Here, if we have M bindings, that is M instances.
+                    # BUT, batch_metadata has P entries (one per path).
+                    # Each entry says "num_randomizations": M.
+                    # If we sum them, we get P * M. That's wrong.
+                    # We want M.
+                    # Wait, if we have multiple jobs, we sum M from each job.
+                    # Inside a job, we have P paths. They all correspond to the SAME M randomizations (logically).
+                    # So we should add M *only once* per job.
+                    
+                    if batch_metadata:
+                        current_job_randomizations = batch_metadata[0].get('num_randomizations', 0)
+                        total_randomizations_accumulated += current_job_randomizations
+
+                    # Flatten Data for aggregation
+                    # extracted_counts is [ [dict, dict...], [dict, dict...] ] (one list per path)
+                    # batch_metadata is [ path1_meta, path2_meta ]
+                    
+                    flat_counts = []
+                    flat_metadata = []
+                    flat_clbits = []
+                    
+                    for i, path_counts_list in enumerate(extracted_counts):
+                        # Ensure path_counts_list is a list
+                        if isinstance(path_counts_list, dict):
+                            path_counts_list = [path_counts_list]
+                            
+                        path_meta = batch_metadata[i]
+                        
+                        for counts in path_counts_list:
+                            flat_counts.append(counts)
+                            flat_metadata.append(path_meta)
+                            if counts:
+                                first_key = next(iter(counts))
+                                flat_clbits.append(len(first_key.replace(" ", "")))
+                            else:
+                                flat_clbits.append(0)
+                                
+                    # Replace for downstream processing
+                    extracted_counts = flat_counts
+                    batch_metadata = flat_metadata
+                    total_clbits_list = flat_clbits
+
+                else:
+                    # Standard Unrolled / Dynamic
+                    for counts in extracted_counts:
+                        if counts:
+                            first_key = next(iter(counts))
+                            total_clbits_list.append(len(first_key.replace(" ", "")))
+                        else:
+                            total_clbits_list.append(0)
 
                 # Calculate Batch Stats and Accumulate
                 # For dynamic circuits, we have a different aggregation logic
-                method = job_record['metadata'].get('method', 'unrolled')
+                # Determine method (Again, cleaner way?)
+                meta = job_record.get('metadata', {})
+                if 'pubs_metadata' in meta:
+                    method = 'parameterized'
+                else:
+                    method = meta.get('method', 'unrolled')
                 
                 if method == 'dynamic':
                     # Dynamic: Single circuit result, but split into "paths" logically?
@@ -386,7 +494,7 @@ def main():
                 
         # Final Calculation over accumulated global stats
         final_fid = 0.0
-        variance_sum = 0.0
+        variance_sum = 0.0 
         
         if global_path_stats:
             print(f"DEBUG: Global Stats for Lambda={epsilon:.4f}")
@@ -403,10 +511,18 @@ def main():
                     
                 print(f"DEBUG: GLOBAL Path {cond_key} -> Success: {stats['success']}, Total: {stats['total']}, Prob: {path_prob:.4f}")
         
-        error_est = np.sqrt(variance_sum)
+        # New Error Estimation: sqrt(Var_statistical + Var_systematic)
+        # Var_statistical = variance_sum (Standard Error of Mean squared)
+        # Var_systematic = (fidelity * lambda / sqrt(N_total))^2
         
-        print(f"Lambda={epsilon:.4f} -> Fidelity={final_fid:.4f} +/- {error_est:.4f} (Batches: {successful_batches}/{len(job_list)})")
-        results_data.append({'lambda': epsilon, 'fidelity': final_fid, 'error': error_est})
+        systematic_error_sq = 0.0
+        if total_randomizations_accumulated > 0:
+            systematic_error_sq = (final_fid * epsilon / np.sqrt(total_randomizations_accumulated)) ** 2
+            
+        total_error = np.sqrt(variance_sum + systematic_error_sq)
+        
+        print(f"Lambda={epsilon:.4f} -> Fidelity={final_fid:.4f} +/- {total_error:.4f} (Batches: {successful_batches}/{len(job_list)})")
+        results_data.append({'lambda': epsilon, 'fidelity': final_fid, 'error': total_error})
 
     # Save
     df = pd.DataFrame(results_data)

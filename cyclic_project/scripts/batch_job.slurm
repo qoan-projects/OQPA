@@ -126,8 +126,8 @@ echo "CPUs: $SLURM_CPUS_PER_TASK"
 # Example 10: Retrieve IBM Parameterized Results
 # Retrieves results for jobs tagged with 'parameterized' from a specific job directory.
 # This is useful for checking the results of the new method specifically.
-echo "Retrieving IBM Parameterized Results..."
-python3 -u ../retrieve_results.py --backend ibm --device ibm_boston --n 3 --k 2 --trials 3 --filter-tag parameterized --output ../data/results/k2/n3/n_trials3/results_ibm_param_retrieved.csv
+# echo "Retrieving IBM Parameterized Results..."
+# python3 -u ../retrieve_results.py --backend ibm --device ibm_boston --n 3 --k 2 --trials 3 --filter-tag parameterized --output ../data/results/k2/n3/n_trials3/results_ibm_param_retrieved.csv
 
 
 # Example 11: Fake Parameterized (New Method)

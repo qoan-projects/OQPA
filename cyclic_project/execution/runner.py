@@ -13,7 +13,7 @@ from qiskit.circuit import CircuitInstruction
 from qiskit.circuit.library import XGate, RZGate
 
 from core.circuit_factory import CircuitFactory
-from core.noise_models import StandardDepolarizingStrategy, PauliTwirlingStrategy
+from core.noise_models import StandardDepolarizingStrategy, PauliTwirlingStrategy, ParameterizedPauliTwirlingStrategy
 from execution.job_service import JobService
 from execution.transpiler_service import TranspilerService
 from execution.backend_handler import AERHandler, FakeBackendHandler, IBMRuntimeHandler
@@ -40,19 +40,25 @@ def run_simulation_point(epsilon: float, config: SimulationConfig, jobs_dir: str
         if config.method == 'dynamic':
             noise_cls = StandardDepolarizingStrategy
             is_dynamic = True
+        elif config.method == 'parameterized':
+            noise_cls = ParameterizedPauliTwirlingStrategy
+            is_dynamic = False
         else:
             noise_cls = PauliTwirlingStrategy
             is_dynamic = False
     elif config.backend == 'fake':
         backend_handler = FakeBackendHandler(config.device)
-        noise_cls = PauliTwirlingStrategy
+        if config.method == 'parameterized':
+            noise_cls = ParameterizedPauliTwirlingStrategy
+        else:
+            noise_cls = PauliTwirlingStrategy
         is_dynamic = False
     else:
         return None
 
     # Instantiate Builder via Factory
     # Note: Factory returns Strategy, which builds circuits
-    strategy = CircuitFactory.create_strategy(config.method, config.k, config.trials, config.n)
+    strategy = CircuitFactory.create_strategy(config.method, config.k, config.trials, config.n, no_reset=config.no_reset)
     
     # Initialize JobService
     job_service = JobService(backend_handler, output_dir=jobs_dir, history_dir=history_dir)
@@ -96,6 +102,131 @@ def run_simulation_point(epsilon: float, config: SimulationConfig, jobs_dir: str
         transpiled_golden_circuits = transpiler_service.transpile(golden_circuits)
         if not isinstance(transpiled_golden_circuits, list):
             transpiled_golden_circuits = [transpiled_golden_circuits]
+
+    # PARAMETERIZED EXECUTION PATH
+    if config.method == 'parameterized':
+        total_randomizations = config.n_random
+        shots_total = config.shots
+        shots_per_binding = max(1, shots_total // total_randomizations)
+        
+        if config.batch_size == -1:
+            bindings_batch_size = total_randomizations
+        else:
+            bindings_batch_size = config.batch_size if config.batch_size > 0 else 50
+            
+        num_jobs = (total_randomizations + bindings_batch_size - 1) // bindings_batch_size
+        
+        # Generate Parameterized Circuits (One per path)
+        noise_strategy = noise_cls(config.k)
+        strategy.set_noise_strategy(noise_strategy)
+        circuits_data = strategy.build(epsilon)
+        
+        path_circuits = []
+        path_metadata = []
+        
+        for item in circuits_data:
+            path_circuits.append(item['circuit'])
+            path_metadata.append(item)
+            
+        # Transpile ONCE per path
+        transpiled_paths = transpiler_service.transpile(path_circuits)
+        if not isinstance(transpiled_paths, list): transpiled_paths = [transpiled_paths]
+        
+        for job_idx in range(num_jobs):
+            # Slice bindings
+            start_idx = job_idx * bindings_batch_size
+            end_idx = min(start_idx + bindings_batch_size, total_randomizations)
+            current_batch_count = end_idx - start_idx
+            
+            # Prepare PUBs for this job
+            # One PUB per path
+            pubs_payload = []
+            
+            for i, qc in enumerate(transpiled_paths):
+                # Generate bindings for this slice
+                bindings = noise_strategy.generate_bindings(qc, current_batch_count, epsilon)
+                pubs_payload.append((qc, bindings, shots_per_binding))
+                
+            # Submit Job with PUBs
+            try:
+                # Create metadata for this job (one entry per path)
+                job_meta = []
+                for i, item in enumerate(path_metadata):
+                    meta_copy = {k: v for k, v in item.items() if k != 'circuit'}
+                    meta_copy.update({
+                        'epsilon': epsilon,
+                        'job_idx': job_idx,
+                        'num_randomizations': current_batch_count,
+                        'shots_per_binding': shots_per_binding,
+                        'type': 'parameterized_unrolled',
+                        'parameters': [p.name for p in transpiled_paths[i].parameters]
+                    })
+                    job_meta.append(meta_copy)
+
+                job_info = job_service.submit_pubs(
+                    pubs_payload,
+                    job_tags=[f"n{config.n}", f"k{config.k}", f"lam{epsilon:.4f}", f"job{job_idx}", "parameterized"],
+                    metadata=job_meta,
+                    dry_run=config.dry_run
+                )
+                
+                if 'record' in job_info:
+                    job_records.append(job_info['record'])
+                
+                if not config.dry_run:
+                    job_id = job_info['job_id']
+                    job_service.save_circuit_metadata(job_id, job_meta)
+                    
+                if config.dry_run or config.post_only:
+                    continue
+                    
+                # Retrieve and Process
+                job = job_info['job_object']
+                pub_result = job.result()
+                
+                # Save local results if needed
+                if config.backend in ['aer', 'fake']:
+                    all_pubs_counts = []
+                    for pub_res in pub_result:
+                        all_pubs_counts.append(ResultProcessor.extract_counts_from_pub_result(pub_res))
+                    job_service.save_local_results(job_id, all_pubs_counts)
+                
+                # Extract counts for each PUB
+                for i, pub_res in enumerate(pub_result):
+                    counts_list = ResultProcessor.extract_counts_from_pub_result(pub_res)
+                    
+                    # Total clbits?
+                    if counts_list and counts_list[0]:
+                        total_clbits = len(next(iter(counts_list[0])).replace(" ", ""))
+                    else:
+                        total_clbits = 0
+                        
+                    # Construct temp metadata list
+                    temp_meta_list = [path_metadata[i]] * len(counts_list)
+                    
+                    batch_stats = result_processor.aggregate_batch_stats(counts_list, temp_meta_list, [total_clbits]*len(counts_list))
+                    
+                    # Merge into global
+                    for cond_key, stats in batch_stats.items():
+                        global_path_stats[cond_key]['success'] += stats['success']
+                        global_path_stats[cond_key]['total'] += stats['total']
+
+            except Exception as e:
+                print(f"Error in parameterized job {job_idx} for epsilon={epsilon}: {e}")
+                import traceback
+                traceback.print_exc()
+
+        final_fid = 0.0
+        if not (config.dry_run or config.post_only):
+            for stats in global_path_stats.values():
+                 if stats['total'] > 0:
+                     final_fid += stats['success'] / stats['total']
+                     
+        return {
+            'epsilon': epsilon,
+            'fidelity': final_fid,
+            'records': job_records
+        }
 
     num_batches = (total_instances + BATCH_SIZE - 1) // BATCH_SIZE
     
@@ -268,7 +399,9 @@ class SimulationRunner:
         # Determine directories
         self.jobs_dir = PathManager.get_job_directory(
             config.backend, config.device_name, config.n, config.k, 
-            config.trials, config.points, config.shots, config.n_random
+            config.trials, config.points, config.shots, config.n_random,
+            lambda_val=config.lambda_val,
+            no_reset=config.no_reset
         )
         self.history_dir = PathManager.get_history_directory(self.jobs_dir)
         PathManager.ensure_dir(self.jobs_dir)
@@ -282,20 +415,28 @@ class SimulationRunner:
         print(f"Backend: {self.config.backend} ({self.config.device_name})")
         print(f"Method:  {self.config.method}")
         print(f"Topology: N={self.config.n}, K={self.config.k}, Trials={self.config.trials}")
-        print(f"Noise: [{self.config.lambda_min}, {self.config.lambda_max}] ({self.config.points} points)")
-        print(f"Twirling: {self.config.n_random} instances")
         
-        lambdas = np.linspace(self.config.lambda_min, self.config.lambda_max, self.config.points)
+        if self.config.lambda_val is not None:
+             print(f"Noise: Single Lambda = {self.config.lambda_val}")
+             lambdas = [self.config.lambda_val]
+        else:
+             print(f"Noise: [{self.config.lambda_min}, {self.config.lambda_max}] ({self.config.points} points)")
+             lambdas = np.linspace(self.config.lambda_min, self.config.lambda_max, self.config.points)
+
+        print(f"Twirling: {self.config.n_random} instances")
         
         # SLURM Array Logic
         if self.config.slurm_task_id is not None:
-            if self.config.slurm_task_id < 0 or self.config.slurm_task_id >= len(lambdas):
-                print(f"Error: SLURM task ID {self.config.slurm_task_id} is out of range.")
-                sys.exit(1)
-            print(f"SLURM Array Mode: Processing task {self.config.slurm_task_id}")
-            lambdas = [lambdas[self.config.slurm_task_id]]
-            base, ext = os.path.splitext(self.config.output)
-            self.config.output = f"{base}_task{self.config.slurm_task_id}{ext}"
+            if self.config.lambda_val is not None:
+                 print("Warning: SLURM Array Task ID ignored because --lambda-val is set.")
+            else:
+                if self.config.slurm_task_id < 0 or self.config.slurm_task_id >= len(lambdas):
+                    print(f"Error: SLURM task ID {self.config.slurm_task_id} is out of range.")
+                    sys.exit(1)
+                print(f"SLURM Array Mode: Processing task {self.config.slurm_task_id}")
+                lambdas = [lambdas[self.config.slurm_task_id]]
+                base, ext = os.path.splitext(self.config.output)
+                self.config.output = f"{base}_task{self.config.slurm_task_id}{ext}"
 
         # Ensure output directory exists
         output_dir = os.path.dirname(self.config.output)
@@ -373,20 +514,29 @@ class SimulationRunner:
             if self.config.method == 'dynamic':
                 noise_cls = StandardDepolarizingStrategy
                 is_dynamic = True
+            elif self.config.method == 'parameterized':
+                noise_cls = ParameterizedPauliTwirlingStrategy
+                is_dynamic = False
             else:
                 noise_cls = PauliTwirlingStrategy
                 is_dynamic = False
         elif self.config.backend == 'fake':
             backend_handler = FakeBackendHandler(self.config.device)
-            noise_cls = PauliTwirlingStrategy
+            if self.config.method == 'parameterized':
+                noise_cls = ParameterizedPauliTwirlingStrategy
+            else:
+                noise_cls = PauliTwirlingStrategy
             is_dynamic = False
         else: # ibm
             backend_handler = IBMRuntimeHandler(backend_name=self.config.device)
-            noise_cls = PauliTwirlingStrategy
+            if self.config.method == 'parameterized':
+                noise_cls = ParameterizedPauliTwirlingStrategy
+            else:
+                noise_cls = PauliTwirlingStrategy
             is_dynamic = False
 
         job_service = JobService(backend_handler, output_dir=self.jobs_dir, history_dir=self.history_dir)
-        strategy = CircuitFactory.create_strategy(self.config.method, self.config.k, self.config.trials, self.config.n)
+        strategy = CircuitFactory.create_strategy(self.config.method, self.config.k, self.config.trials, self.config.n, no_reset=self.config.no_reset)
         result_processor = ResultProcessor(self.config.k)
         
         # Optimization: Fast Path for Unrolled + PauliTwirling
@@ -411,7 +561,7 @@ class SimulationRunner:
             print("Golden circuits transpiled.")
 
         # Batch Execution Context (Post-Only)
-        use_batch_context = (self.config.backend == 'ibm' and self.config.post_only)
+        use_batch_context = (self.config.backend == 'ibm' and self.config.post_only and not self.config.no_batchmode)
         
         def run_loop():
             # Create a reusable TranspilerService for the loop
@@ -420,6 +570,175 @@ class SimulationRunner:
             loop_transpiler = TranspilerService(loop_backend)
 
             for epsilon in tqdm(lambdas):
+                
+                # PARAMETERIZED EXECUTION PATH
+                if self.config.method == 'parameterized':
+                    total_randomizations = self.config.n_random
+                    shots_total = self.config.shots
+                    
+                    # Shots per randomization: shots // n_random
+                    # But Sampler V2 with PUBs handles shots differently.
+                    # A PUB is (circuit, bindings, shots).
+                    # The 'shots' arg in PUB is shots PER BINDING.
+                    shots_per_binding = max(1, shots_total // total_randomizations)
+                    
+                    # Batch size controls how many bindings per PUB? 
+                    # No, we can send ALL bindings in one PUB usually.
+                    # But if batch_size is set, let's respect it to split into multiple jobs if needed.
+                    # If batch_size == -1, send all in one job.
+                    
+                    # Generate Parameterized Circuits (One per path)
+                    noise_strategy = noise_cls(self.config.k)
+                    strategy.set_noise_strategy(noise_strategy)
+                    circuits_data = strategy.build(epsilon) # epsilon used to init strategy params? 
+                    # Note: strategy.build() calls apply_noise(epsilon). 
+                    # For Parameterized, apply_noise uses epsilon only to check if > 0 maybe?
+                    # Actually apply_noise signature is (qc, regs, epsilon). 
+                    # Our implementation ignores epsilon for circuit construction structure, which is correct.
+                    
+                    path_circuits = []
+                    path_metadata = []
+                    
+                    for item in circuits_data:
+                        path_circuits.append(item['circuit'])
+                        path_metadata.append(item)
+                        
+                    # Transpile ONCE per path
+                    transpiled_paths = loop_transpiler.transpile(path_circuits)
+                    if not isinstance(transpiled_paths, list): transpiled_paths = [transpiled_paths]
+                    
+                    # Prepare Bindings for each path
+                    # We need to generate 'total_randomizations' bindings for each path.
+                    # If we need to split into batches (jobs), we split the bindings.
+                    
+                    if self.config.batch_size == -1:
+                        bindings_batch_size = total_randomizations
+                    else:
+                        bindings_batch_size = self.config.batch_size if self.config.batch_size > 0 else 50
+                        
+                    num_jobs = (total_randomizations + bindings_batch_size - 1) // bindings_batch_size
+                    
+                    global_path_stats = defaultdict(lambda: {'success': 0, 'total': 0})
+
+                    for job_idx in range(num_jobs):
+                        # Slice bindings
+                        start_idx = job_idx * bindings_batch_size
+                        end_idx = min(start_idx + bindings_batch_size, total_randomizations)
+                        current_batch_count = end_idx - start_idx
+                        
+                        # Prepare PUBs for this job
+                        # One PUB per path
+                        pubs_payload = []
+                        
+                        for i, qc in enumerate(transpiled_paths):
+                            # Generate bindings for this slice
+                            # Note: generate_bindings generates new random bindings every time.
+                            # We want N_random total. 
+                            # We can just generate 'current_batch_count' fresh bindings.
+                            bindings = noise_strategy.generate_bindings(qc, current_batch_count, epsilon)
+                            pubs_payload.append((qc, bindings, shots_per_binding))
+                            
+                        # Submit Job with PUBs
+                        try:
+                            # Create metadata for this job (one entry per path)
+                            # We attach the parameters list to metadata for safety
+                            job_meta = []
+                            for i, item in enumerate(path_metadata):
+                                meta_copy = {k: v for k, v in item.items() if k != 'circuit'}
+                                meta_copy.update({
+                                    'epsilon': epsilon,
+                                    'job_idx': job_idx,
+                                    'num_randomizations': current_batch_count,
+                                    'shots_per_binding': shots_per_binding,
+                                    'type': 'parameterized_unrolled',
+                                    'parameters': [p.name for p in transpiled_paths[i].parameters]
+                                })
+                                job_meta.append(meta_copy)
+
+                            job_info = job_service.submit_pubs(
+                                pubs_payload,
+                                job_tags=[f"n{self.config.n}", f"k{self.config.k}", f"lam{epsilon:.4f}", f"job{job_idx}", "parameterized"],
+                                metadata=job_meta,
+                                dry_run=self.config.dry_run
+                            )
+                            
+                            if not self.config.dry_run:
+                                job_id = job_info['job_id']
+                                job_service.save_circuit_metadata(job_id, job_meta)
+                                
+                            if self.config.dry_run or self.config.post_only:
+                                continue
+                                
+                            # Retrieve and Process
+                            job = job_info['job_object']
+                            pub_result = job.result()
+                            
+                            # Save local results if needed (for consistency with parallel mode)
+                            if self.config.backend in ['aer', 'fake']:
+                                all_pubs_counts = []
+                                for pub_res in pub_result:
+                                    all_pubs_counts.append(ResultProcessor.extract_counts_from_pub_result(pub_res))
+                                job_service.save_local_results(job_id, all_pubs_counts)
+                            
+                            # Extract counts for each PUB
+                            # pub_result[i] corresponds to path i
+                            # pub_result[i].data.meas.get_counts() returns list of dicts (one per binding)
+                            
+                            for i, pub_res in enumerate(pub_result):
+                                # This is for path i
+                                # Check data format.
+                                # Assuming measurement register is named 'readout' or 'meas' or 'c'
+                                # ResultProcessor needs to handle this.
+                                # Let's extract raw counts here or delegate?
+                                # ResultProcessor.extract_counts_from_pub_result(pub_res)
+                                
+                                # Let's stick to list of counts for compatibility
+                                counts_list = ResultProcessor.extract_counts_from_pub_result(pub_res)
+                                
+                                # Aggregate stats for this path
+                                # We need 'conditions' from metadata
+                                conds = path_metadata[i].get('conditions', {})
+                                
+                                # Total clbits?
+                                if counts_list and counts_list[0]:
+                                    total_clbits = len(next(iter(counts_list[0])).replace(" ", ""))
+                                else:
+                                    total_clbits = 0 # Should not happen
+                                    
+                                # Use existing aggregator
+                                # We can treat this list of counts as a "batch" for this single path
+                                # But aggregate_batch_stats expects a list of counts AND list of metadata
+                                # Here we have 1 metadata (path conditions) and N counts.
+                                # Construct temp metadata list
+                                temp_meta_list = [path_metadata[i]] * len(counts_list)
+                                
+                                batch_stats = result_processor.aggregate_batch_stats(counts_list, temp_meta_list, [total_clbits]*len(counts_list))
+                                
+                                # Merge into global
+                                for cond_key, stats in batch_stats.items():
+                                    global_path_stats[cond_key]['success'] += stats['success']
+                                    global_path_stats[cond_key]['total'] += stats['total']
+
+                        except Exception as e:
+                            print(f"Error in parameterized job {job_idx}: {e}")
+                            import traceback
+                            traceback.print_exc()
+
+                    # Finalize Epsilon Point
+                    if not (self.config.dry_run or self.config.post_only):
+                        final_fid = 0.0
+                        for stats in global_path_stats.values():
+                             if stats['total'] > 0:
+                                 final_fid += stats['success'] / stats['total']
+                        
+                        print(f"Lambda={epsilon:.4f} -> Fidelity={final_fid:.4f}")
+                        self.results_data.append({'lambda': epsilon, 'fidelity': final_fid})
+                        sys.stdout.flush()
+
+                    continue # End of Parameterized Loop
+
+                # --- END PARAMETERIZED BLOCK ---
+
                 total_instances = self.config.n_random if not is_dynamic else 1
                 shots_per_circuit = max(1, self.config.shots // total_instances)
                 

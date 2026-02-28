@@ -1,7 +1,7 @@
 import os
 import json
 import pandas as pd
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from qiskit import QuantumCircuit
 from execution.backend_handler import BackendHandler
 
@@ -15,6 +15,35 @@ class JobService:
         os.makedirs(self.output_dir, exist_ok=True)
         if self.history_dir != self.output_dir:
             os.makedirs(self.history_dir, exist_ok=True)
+
+    def submit_pubs(self, 
+                    pubs: List[Tuple[QuantumCircuit, Any, int]], 
+                    job_tags: List[str],
+                    metadata: List[Dict[str, Any]],
+                    dry_run: bool = False) -> Dict[str, Any]:
+        """
+        Submit a list of PUBs (Primitive Unified Blocs) to Sampler V2.
+        PUB format: (circuit, bindings, shots)
+        """
+        if dry_run:
+            return {"job_id": "dry_run", "status": "simulated"}
+
+        try:
+            print(f"Submitting {len(pubs)} PUBs...")
+            # SamplerV2.run accepts a list of PUBs
+            job = self.sampler.run(pubs)
+            job_id = job.job_id()
+            print(f"Job submitted! ID: {job_id}")
+            
+            # Metadata is a list corresponding to paths (PUBs)
+            # We can save it as is.
+            self._save_job_record(job_id, job_tags, {"pubs_metadata": metadata})
+                
+            return {"job_id": job_id, "job_object": job, "record": self._create_record(job_id, job_tags, {"pubs_metadata": metadata})}
+            
+        except Exception as e:
+            print(f"Error submitting PUBs: {e}")
+            raise e
 
     def submit_batch(self, 
                      transpiled_circuits: List[QuantumCircuit], 

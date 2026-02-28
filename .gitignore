@@ -5,3 +5,10 @@ data/
 reqs/Miniconda3-latest-MacOSX-x86_64.sh
 __pycache__
 .vscode/
+cyclic_project/data/jobs/*
+cyclic_project/data/logs/*
+cyclic_project/legacy
+cyclic_project/.env
+!cyclic_project/data/
+!cyclic_project/data/plots/
+!cyclic_project/data/results/

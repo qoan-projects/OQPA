@@ -44,9 +44,13 @@ class ising_class:
             # Odd pairs
             for i in range(1, self.k - 1, 2):
                 qc.append(RZZGate(-2 * self.J * dt), [i, i + 1])
+            # Barrier after Z_i Z_{i+1} terms
+            qc.barrier()
             # Transverse field
             for i in range(self.k):
                 qc.rx(-2 * self.h * dt, i)
+            # Barrier after X_i terms
+            qc.barrier()
         return qc
 
     def apply_ising_to_registers(self, qc):
@@ -168,7 +172,7 @@ def main():
                         help='Minimum epsilon (noise strength) value to sweep (default: 0.0)')
     parser.add_argument('--epsilon-max', type=float, default=0.009, metavar='epsilon_MAX',
                         help='Maximum epsilon value to sweep (default: 0.009)')
-    parser.add_argument('--epsilon-steps', type=int, default=10, metavar='NSTEPS',
+    parser.add_argument('--epsilon-steps', type=int, default=11, metavar='NSTEPS',
                         help='Number of steps between ε_min and ε_max (default: 10)')
     parser.add_argument('--epsilon-index', type=int, default=None,
                         help='Use only one ε value by index instead of sweeping (default: None)')
@@ -184,14 +188,27 @@ def main():
                         help='Number of Trotter steps (default: 5)')
     parser.add_argument('--output', type=str, default='data/fidelity_vs_epsilon.csv', metavar='OUTPUT',
                         help='Path to output CSV file (default: data/fidelity_vs_epsilon.csv)')
+    parser.add_argument('--smoke-test', action='store_true', help='Show transpiled Trotterized Ising circuit and exit (no simulation)')
     args = parser.parse_args()
     k = args.k
     shots = args.shots
+    t, J, h, steps = args.t, args.J, args.h, args.steps
+    if args.smoke_test:
+        import matplotlib.pyplot as plt
+        ising = ising_class(k, steps, t, J, h)
+        qc = ising.get_trotterized_ising_circuit()
+        from qiskit import transpile
+        from qiskit_aer import AerSimulator
+        sim = AerSimulator()
+        tqc = transpile(qc, sim)
+        circuit_drawer(tqc, output='mpl')
+        plt.show()
+        return
+
     epsilons = np.linspace(args.epsilon_min, args.epsilon_max, args.epsilon_steps)
     if args.epsilon_index is not None:
         epsilons = [epsilons[args.epsilon_index]]
     nqpa = args.nqpa
-    t, J, h, steps = args.t, args.J, args.h, args.steps
 
     ising = ising_class(k, steps, t, J, h)
     exact_state = compute_exact_statevector(k, t, J, h)

@@ -1,0 +1,108 @@
+import os
+import numpy as np
+
+from qiskit import QuantumCircuit, transpile
+from qiskit.circuit import Parameter
+
+from qiskit_ibm_runtime import QiskitRuntimeService, Executor
+from qiskit_ibm_runtime.quantum_program import QuantumProgram
+
+
+def load_token():
+    try:
+        from dotenv import load_dotenv
+        here = os.path.dirname(os.path.abspath(__file__))
+        load_dotenv(os.path.join(here, ".env"))
+    except Exception:
+        pass
+
+    token = os.getenv("IBM_QUANTUM_TOKEN") or os.getenv("IBM_API")
+    if not token:
+        raise RuntimeError("Set IBM_QUANTUM_TOKEN or IBM_API in env or .env")
+    return token
+
+
+def angles_for_pauli(label: str):
+    pi = np.pi
+    if label == "I": # (theta, phi, lam_u)
+        return (0.0, 0.0, 0.0) 
+    if label == "X":
+        return (pi, 0.0, pi)
+    if label == "Y":
+        return (pi, pi / 2.0, pi / 2.0)
+    if label == "Z":
+         return (0.0, 0.0, pi)
+    raise ValueError(label)
+
+
+def main():
+    lam = 0
+    N = 4000
+    shots = 1
+    seed = 0
+
+    rng = np.random.default_rng(seed)
+
+    theta = Parameter("theta")
+    phi = Parameter("phi")
+    lam_u = Parameter("lam_u")
+
+    qc = QuantumCircuit(1, 1)
+    qc.reset(0)
+    qc.rz(phi, 0)
+    qc.ry(theta, 0)
+    qc.rz(lam_u, 0)
+    qc.measure(0, 0)
+
+    labels = np.array(["I", "X", "Y", "Z"], dtype=object)
+    probs = np.array([1.0 - 3.0 * lam / 4.0, lam / 4.0, lam / 4.0, lam / 4.0], dtype=float)
+
+    choices = rng.choice(labels, size=N, p=probs)
+    angle_table = np.array([angles_for_pauli(c) for c in choices], dtype=float)
+
+    token = load_token()
+    service = QiskitRuntimeService(channel="ibm_quantum_platform", token=token, instance="QC1")
+    # backend = service.least_busy(operational=True, simulator=False)
+    backend = service.backend("ibm_boston")
+
+    print("backend:", backend.name)
+
+    qc_t = transpile(qc, backend=backend, optimization_level=0)
+
+    # angle_table is currently (theta, phi, lam_u)
+    # qc_t.parameters order is (lam_u, phi, theta)
+    col_index = {"theta": 0, "phi": 1, "lam_u": 2}
+    perm = [col_index[p.name] for p in qc_t.parameters]
+    angle_table_t = angle_table[:, perm]
+    print(angle_table_t)
+
+    program = QuantumProgram(shots=shots)
+    program.append_circuit_item(qc_t, circuit_arguments=angle_table_t)
+
+    executor = Executor(backend)
+    job = executor.run(program)
+
+    print("job id:", job.job_id())
+    print("status:", job.status())
+
+    res = job.result()
+    item0 = list(res)[0]
+    raw = np.asarray(item0["c"]).reshape(-1)          # bools
+    bits = (~raw).astype(np.int8)                     # True->0, False->1
+
+    n1 = int(bits.sum())
+    n0 = int(bits.size - n1)
+    p1 = n1 / bits.size
+
+    lam_hat = 2.0 * p1
+
+    print("N:", bits.size, "shots:", shots)
+    print("counts:", {"0": n0, "1": n1})
+    print("p(1):", round(p1, 6))
+    print("lambda_hat:", round(lam_hat, 6))
+    print("first 20 choices:", choices[:20].tolist())
+    print("first 20 bits:", bits[:20].tolist())
+
+
+if __name__ == "__main__":
+    main()

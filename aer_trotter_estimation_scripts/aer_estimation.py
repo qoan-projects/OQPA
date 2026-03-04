@@ -1,31 +1,27 @@
 #!/usr/bin/env python3
+"""
+QPA + Trotterized Ising simulation with arbitrary inputs.
+- Uses ising_class for Ising circuit
+- Uses CircuitFactory/UnrolledStrategy for QPA circuit
+- Uses original noise generation
+"""
 import numpy as np
 import pandas as pd
-import argparse
-from tqdm import tqdm
-import time
-import os
-
-from scipy.linalg import expm
-from qiskit import QuantumCircuit, transpile, ClassicalRegister, QuantumRegister
-from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
-from qiskit.quantum_info import (
-    Statevector,
-    SparsePauliOp
-)
+from qiskit import transpile, QuantumCircuit
 from qiskit_aer import AerSimulator
-import qiskit.circuit.classical as qiskit_classical
-from qiskit_aer.primitives import EstimatorV2 as AerEstimator
-from qiskit_aer.noise import (
-    NoiseModel,
-    QuantumError,
-    ReadoutError,
-    depolarizing_error,
-    pauli_error,
-    thermal_relaxation_error,
-)
-from qiskit.circuit.library import RZZGate, IGate
+from qiskit.quantum_info import Statevector
+from qiskit_aer.noise import NoiseModel, depolarizing_error, ReadoutError
+from qiskit.circuit.library import RZZGate
 from qiskit.visualization import circuit_drawer
+import matplotlib.pyplot as plt
+from scipy.linalg import expm
+
+# Import QPA circuit logic
+from core.circuit_factory import CircuitFactory
+from core.strategies.unrolled import UnrolledStrategy
+from core.noise_models import StandardDepolarizingStrategy, PauliTwirlingStrategy
+
+# --- Ising class and exact statevector ---
 class ising_class:
     def __init__(self, k, steps, t, J, h):
         self.k = k
@@ -44,17 +40,11 @@ class ising_class:
             # Odd pairs
             for i in range(1, self.k - 1, 2):
                 qc.append(RZZGate(-2 * self.J * dt), [i, i + 1])
+            qc.barrier()
             # Transverse field
             for i in range(self.k):
                 qc.rx(-2 * self.h * dt, i)
-        return qc
-
-    def apply_ising_to_registers(self, qc):
-        ising = self.get_trotterized_ising_circuit()
-        for reg in [1, 2, 3]:
-            for gate, qargs, cargs in ising.data:
-                mapped_qargs = [qc.qubits[reg * self.k + ising.qubits.index(q)] for q in qargs]
-                qc.append(gate, mapped_qargs, cargs)
+            qc.barrier()
         return qc
 
     def get_trotterized_ising_statevector(self):
@@ -65,189 +55,230 @@ class ising_class:
         return result.get_statevector()
 
 def compute_exact_statevector(k, t, J, h):
-    """
-    Compute the exact statevector for the Ising Hamiltonian:
-    H = -J ∑ Z_i Z_{i+1} - h ∑ X_i
-
-    Args:
-        k: number of qubits
-        t: total evolution time
-        J: interaction strength
-        h: transverse field strength
-
-    Returns:
-        exact_state: Qiskit Statevector object
-    """
     dim = 2**k
     I = np.eye(2)
     X = np.array([[0, 1], [1, 0]])
     Z = np.array([[1, 0], [0, -1]])
-
     def kron_n(*ops):
         out = ops[0]
         for op in ops[1:]:
             out = np.kron(out, op)
         return out
-
-    # Build Hamiltonian
     H = np.zeros((dim, dim), dtype=complex)
-
-    # Z_i Z_{i+1} terms
     for q in range(k - 1):
         ops = [I] * k
         ops[q] = Z
         ops[q + 1] = Z
         H += -J * kron_n(*ops)
-
-    # X_i terms
     for q in range(k):
         ops = [I] * k
         ops[q] = X
         H += -h * kron_n(*ops)
-
-    # Initial state |000>
     psi0 = np.zeros(dim, dtype=complex)
     psi0[0] = 1.0
 
-    # Time evolution: U = exp(-iHt)
     U = expm(-1j * H * t)
     psi_final = U @ psi0
-
-    # Convert to Qiskit Statevector
     return Statevector(psi_final)
 
-
-def get_QPA_circuit(k, N, ising_circuit):
-    cr_q0 = ClassicalRegister(k, name='control')
-    qr_all = QuantumRegister(4 * k)
-    qcSWAP = QuantumCircuit(qr_all, cr_q0)
-    qc = ising_circuit.apply_ising_to_registers(qcSWAP)
-
-    def recursive(N, qc):
-        for i in range(k):
-            qc.reset(i)
-        qc.h(0)
-        for i in range(k - 1):
-            qc.cx(0, 1 + i)
-        for i in range(k):
-            qc.append(IGate(label='id_noisy'), [i])
-            qc.cswap(0 + i, i + k, i + 2 * k)
-        for i in range(k):
-            qc.h(i)
-        for i in range(k):
-            qc.measure(i, cr_q0[i])
-            if i == 0:
-                parity_control = qiskit_classical.expr.lift(cr_q0[i])
-            else:
-                parity_control = qiskit_classical.expr.bit_xor(parity_control, cr_q0[i])
-        with qc.if_test(parity_control) as _else:
-            pass
-        with _else:
-            for i in range(k):
-                qc.swap(i + 2 * k, i + 3 * k)
-            if N != 1:
-                qc = recursive(N - 1, qc)
-        return qc
-
-    if N != 0:
-        qc = recursive(N, qcSWAP)
-    else:
-        qc = qcSWAP
-    return qc
-
+# --- Main simulation stub ---
 def main():
-    parser = argparse.ArgumentParser(
-        description="Run the QPA-ising circuit simulation and evaluate fidelity vs noise strength (λ)."
-    )
+    import argparse, os
+    from tqdm import tqdm
 
-    parser.add_argument('--k', type=int, default=3, metavar='NQUBITS',
-                        help='Number of qubits per register (default: 3)')
-    parser.add_argument('--shots', type=int, default=1024, metavar='SHOTS',
-                        help='Number of shots per circuit execution (default: 1024)')
-    parser.add_argument('--epsilon-min', type=float, default=0.0, metavar='epsilon_MIN',
-                        help='Minimum epsilon (noise strength) value to sweep (default: 0.0)')
-    parser.add_argument('--epsilon-max', type=float, default=0.009, metavar='epsilon_MAX',
-                        help='Maximum epsilon value to sweep (default: 0.009)')
-    parser.add_argument('--epsilon-steps', type=int, default=10, metavar='NSTEPS',
-                        help='Number of steps between ε_min and ε_max (default: 10)')
-    parser.add_argument('--epsilon-index', type=int, default=None,
-                        help='Use only one ε value by index instead of sweeping (default: None)')
-    parser.add_argument('--nqpa', type=int, default=1, metavar='NQPA',
-                    help='Number of QPA rounds to apply (default: 1)')
-    parser.add_argument('--t', type=float, default=1.0,
-                        help='Total evolution time for Ising circuit (default: 5.0)')
-    parser.add_argument('--J', type=float, default=1.0,
-                        help='Interaction strength J (default: 1.0)')
-    parser.add_argument('--h', type=float, default=1.0,
-                        help='Transverse field h (default: 1.0)')
-    parser.add_argument('--steps', type=int, default=5,
-                        help='Number of Trotter steps (default: 5)')
-    parser.add_argument('--output', type=str, default='data/fidelity_vs_epsilon.csv', metavar='OUTPUT',
-                        help='Path to output CSV file (default: data/fidelity_vs_epsilon.csv)')
+    parser = argparse.ArgumentParser(description="QPA + Trotterized Ising simulation with arbitrary inputs")
+    parser.add_argument('--k', type=int, default=2, help='Number of qubits per register')
+    parser.add_argument('--steps', type=int, default=10, help='Number of Trotter steps')
+    # parser.add_argument('--steps-list', type=str, default='2,4,6,8,10,12,14,16,18,20', help='Comma-separated list of steps to sweep (fixes epsilon)')
+    parser.add_argument('--steps-list', type=str, help='Comma-separated list of steps to sweep (fixes epsilon)')
+    parser.add_argument('--t', type=float, default=1.0, help='Total evolution time')
+    parser.add_argument('--J', type=float, default=1.0, help='Ising interaction strength')
+    parser.add_argument('--h', type=float, default=1.0, help='Transverse field strength')
+    parser.add_argument('--method', type=str, default='dynamic', choices=['unrolled','dynamic'], help='QPA circuit method')
+    parser.add_argument('--n', type=int, default=3, help='Number of registers')
+    parser.add_argument('--trials', type=int, default=3, help='Number of QPA rounds')
+    parser.add_argument('--shots', type=int, default=20000, help='Number of shots')
+    # compatibility single-epsilon
+    parser.add_argument('--epsilon', type=float, default=None, help='Single depolarizing noise strength (if provided, overrides sweep)')
+    # epsilon sweep args
+    parser.add_argument('--epsilon-min', type=float, default=0.0, help='Minimum epsilon (noise strength)')
+    parser.add_argument('--epsilon-max', type=float, default=0.001, help='Maximum epsilon (noise strength)')
+    parser.add_argument('--epsilon-steps', type=int, default=11, help='Number of epsilon steps (inclusive)')
+    parser.add_argument('--epsilon-index', type=int, default=None, help='Select single epsilon by index (overrides sweep)')
+    parser.add_argument('--output', type=str, default='data/fidelity_vs_epsilon.csv', help='Output CSV file')
+    parser.add_argument('--noise', type=str, default='depolarizing', choices=['depolarizing','twirling'], help='Noise model')
+    parser.add_argument('--smoke-test', action='store_true', help='Show transpiled circuit and exit (no simulation)')
     args = parser.parse_args()
-    k = args.k
-    shots = args.shots
-    epsilons = np.linspace(args.epsilon_min, args.epsilon_max, args.epsilon_steps)
-    if args.epsilon_index is not None:
-        epsilons = [epsilons[args.epsilon_index]]
-    nqpa = args.nqpa
-    t, J, h, steps = args.t, args.J, args.h, args.steps
 
-    ising = ising_class(k, steps, t, J, h)
-    exact_state = compute_exact_statevector(k, t, J, h)
+    from qiskit.quantum_info import SparsePauliOp
 
-    projector_q3 = SparsePauliOp.from_operator(exact_state.to_operator())
-    identity_op = SparsePauliOp(["I" * k])
-    # pauli_str = "XYZIXZZIYXYZ"
-    # full_projector = SparsePauliOp.from_list([(pauli_str, 1)])
-    full_projector = projector_q3.tensor(identity_op).tensor(identity_op).tensor(identity_op)
-    # full_projector = identity_op.tensor(identity_op).tensor(identity_op).tensor(identity_op)
+    # Build QPA strategy (strategy reused across sweep; build called per-eps below)
+    strategy = CircuitFactory.create_strategy(args.method, args.k, args.trials, args.n)
+    # noise_strategy = StandardDepolarizingStrategy(args.k) if args.noise == 'depolarizing' else PauliTwirlingStrategy(args.k)
+    # strategy.set_noise_strategy(noise_strategy)
 
-    # very simple full_projector for debugging, but very slow
-    # zero_state = Statevector.from_label("0" * d * 4)
-    # full_projector = SparsePauliOp.from_operator(zero_state.to_operator())
-    purified_fidelity = []
-    # pass_manager = generate_preset_pass_manager(3, AerSimulator())
+    # Determine mode and sweep values. If --steps-list provided, run steps-sweep
+    # with a fixed epsilon; otherwise fix steps and sweep epsilon.
+    if args.steps_list:
+        steps_vals = [int(x) for x in args.steps_list.split(',') if x.strip()]
+        epsilons = np.array([args.epsilon if args.epsilon is not None else args.epsilon_max])
+        mode = 'steps'
+    else:
+        steps_vals = [args.steps]
+        if args.epsilon is not None:
+            epsilons = np.array([args.epsilon])
+        else:
+            epsilons = np.linspace(args.epsilon_min, args.epsilon_max, max(1, args.epsilon_steps))
+            if args.epsilon_index is not None:
+                epsilons = np.array([epsilons[args.epsilon_index]])
+        mode = 'epsilon'
 
-    for eps in tqdm(epsilons, desc="Sweeping over ε", unit="ε"):
-        # t0 = time.perf_counter()
-        noise_model = NoiseModel()
-        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 1), ['id_noisy', 'rx'])
-        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 2), ['rzz'])
-        noise_model.add_all_qubit_quantum_error(depolarizing_error(eps, 3), ['cswap'])
-        readout_error = ReadoutError([[1 - eps, eps], [eps, 1 - eps]])
-        noise_model.add_all_qubit_readout_error(readout_error)
-        estimator = AerEstimator(options={
-            'backend_options': {
-                'noise_model': noise_model,
-                'shots': shots
-            }
-        })
-        #, device = 'GPU'
-        
-        QPA = get_QPA_circuit(k, nqpa, ising)
-        # isa_circuit = pass_manager.run(QPA)
-        # qc_transpiled = transpile(isa_circuit)
+    from qiskit.quantum_info import SparsePauliOp
 
-        # t1 = time.perf_counter()
-        result = estimator.run([(QPA, full_projector, None)]).result()
-        # t2 = time.perf_counter()
-        fidelity = result[0].data.evs
-        purified_fidelity.append(fidelity)
-        
-        # print(f"Delta t1: {t1 - t0:.3f} sec", flush=True)
-        # print(f"Delta t2: {t2 - t1:.3f} sec", flush=True)
+    # Containers for results
+    if mode == 'steps':
+        fidelities_steps = []
+    else:
+        fidelities = []
 
-    os.makedirs("data", exist_ok=True)
-    df = pd.DataFrame({
-    'epsilon': list(epsilons),
-    f'QPA_{args.nqpa}': purified_fidelity
-    })
-    df.to_csv(args.output, index=False)
-    print(f'[+] Output saved to {args.output}')
-    # if args.epsilon_index==0:
-    #     circuit_path = args.output.replace(".csv", "_original.png")
-    #     circuit_drawer(QPA, output='mpl', filename=circuit_path)
-    #     print(f"[+] Saved original circuit to {circuit_path}")
+    # Unified nested loop: for each epsilon and each steps value build circuits,
+    # pad projector, create noise model, and run estimator. This covers both
+    # the steps-sweep (multiple steps, single epsilon) and epsilon-sweep
+    # (single steps, multiple epsilons) cases.
+    for eps in tqdm(epsilons, desc="ε sweep"):
+        for s in steps_vals:
+            # Build Ising and exact state for this steps value
+            ising = ising_class(args.k, s, args.t, args.J, args.h)
+            ising_circuit = ising.get_trotterized_ising_circuit()
+            exact_state = ising.get_trotterized_ising_statevector()
+            projector_op = SparsePauliOp.from_operator(exact_state.to_operator())
+
+            # Build QPA strategy and circuit for this epsilon
+            circuits_data = strategy.build(eps)
+            qpa_circuit = circuits_data[0]['circuit'] if circuits_data else None
+
+            # prepend Ising to every data register
+            full_circuit = qpa_circuit.copy()
+            data_regs = [reg for reg in full_circuit.qregs if reg.name.startswith('R')]
+            for reg in data_regs:
+                full_circuit.compose(ising_circuit, qubits=reg, inplace=True, front=True)
+
+            # prepare padded projector acting on reserve register
+            data_regs = [reg for reg in full_circuit.qregs if reg.name.startswith('R')]
+            reserve_reg = data_regs[-1]
+            reserve_indices = [full_circuit.find_bit(q).index for q in reserve_reg]
+            total_qubits = full_circuit.num_qubits
+            num_identity_left = min(reserve_indices)
+            num_identity_right = total_qubits - max(reserve_indices) - 1
+
+            identity_left = SparsePauliOp(["I" * num_identity_left]) if num_identity_left > 0 else None
+            identity_right = SparsePauliOp(["I" * num_identity_right]) if num_identity_right > 0 else None
+
+            if identity_left and identity_right:
+                full_projector = identity_right.tensor(projector_op).tensor(identity_left)
+            elif identity_left:
+                full_projector = projector_op.tensor(identity_left)
+            elif identity_right:
+                full_projector = identity_right.tensor(projector_op)
+            else:
+                full_projector = projector_op
+
+            # build noise model for this epsilon
+            noise_model = NoiseModel()
+            # helper to clamp depolarizing probability to a safe range
+            def _safe_depolarizing(p, nq):
+                p = float(p)
+                # clamp to [0, 0.999999] to avoid library errors for extreme values
+                p = max(0.0, min(p, 0.999999))
+                return depolarizing_error(p, nq)
+
+            # Scale noise roughly by gate size but keep probabilities within valid bounds
+            p_rx = eps
+            p_swap = min(eps * 2.0, 0.999999)
+            p_rzz = min(eps * 10.0, 0.999999)
+            p_cswap = min(eps * 20.0, 0.999999)
+            p_init = eps
+
+            noise_model.add_all_qubit_quantum_error(_safe_depolarizing(p_rx, 1), ['rx'])
+            noise_model.add_all_qubit_quantum_error(_safe_depolarizing(p_swap, 2), ['swap'])
+            # apply same two-qubit rzz-level error to rzz and swap gates
+            noise_model.add_all_qubit_quantum_error(_safe_depolarizing(p_rzz, 2), ['rzz'])
+            noise_model.add_all_qubit_quantum_error(_safe_depolarizing(p_cswap, 3), ['cswap'])
+            # add single-qubit initialization/reset error
+            noise_model.add_all_qubit_quantum_error(_safe_depolarizing(p_init, 1), ['initialize', 'reset'])
+            readout_error = ReadoutError([[1 - eps, eps], [eps, 1 - eps]])
+            noise_model.add_all_qubit_readout_error(readout_error)
+
+            from qiskit_aer.primitives import EstimatorV2 as AerEstimator
+            estimator = AerEstimator(options={
+                'backend_options': {
+                    'noise_model': noise_model,
+                    'shots': args.shots
+                }
+            })
+
+            # remove measurements that write into classical register named 'readout'
+            readout_bits = set()
+            for creg in full_circuit.cregs:
+                if getattr(creg, "name", "") == "readout":
+                    for cb in creg:
+                        readout_bits.add(cb)
+
+            full_circuit.data = [
+                (inst, qargs, cargs)
+                for inst, qargs, cargs in full_circuit.data
+                if not (inst.name == 'measure' and any(cb in readout_bits for cb in cargs))
+            ]
+
+            result = estimator.run([(full_circuit, full_projector, None)]).result()
+            fidelity = float(result[0].data.evs)
+
+            if mode == 'steps':
+                fidelities_steps.append(fidelity)
+            else:
+                fidelities.append(fidelity)
+
+    # After sweep: write CSV according to mode
+    def fmt(v):
+        s = str(v)
+        return s.replace('.', 'p')
+
+    base_out = args.output
+    if base_out.endswith('.csv'):
+        base_root = base_out[:-4]
+    else:
+        base_root = base_out
+
+    if mode == 'steps':
+        # metadata: include fixed epsilon in filename
+        eps_fixed = epsilons[0]
+        meta_parts = [f"k{fmt(args.k)}", f"n{fmt(args.n)}", f"trials{fmt(args.trials)}", f"epsilon{fmt(eps_fixed)}"]
+        out_path = f"{base_root}_stepsSweep_{'_'.join(str(s) for s in steps_vals)}_{'_'.join(meta_parts)}.csv"
+        out_dir = os.path.dirname(out_path) or 'data'
+        os.makedirs(out_dir, exist_ok=True)
+        df_steps = pd.DataFrame({'steps': steps_vals, 'fidelity': fidelities_steps})
+        df_steps.to_csv(out_path, index=False)
+        print(f'[+] Steps-sweep CSV saved to {out_path}')
+    else:
+        # epsilon sweep CSV
+        meta_keys = ['k', 'n', 'trials', 'steps', 't', 'J', 'h', 'method', 'noise', 'shots', 'epsilon_max']
+        meta_parts = []
+        for key in meta_keys:
+            val = getattr(args, key)
+            meta_parts.append(f"{key}{fmt(val)}")
+        meta_suffix = '_'.join(meta_parts)
+        out_path = f"{base_root}_{meta_suffix}.csv"
+        out_dir = os.path.dirname(out_path) or 'data'
+        os.makedirs(out_dir, exist_ok=True)
+        df = pd.DataFrame({'epsilon': list(epsilons), 'fidelity': fidelities})
+        df.to_csv(out_path, index=False)
+        print(f'[+] Simple CSV saved to {out_path}')
+
+    # Plot / save the final full_circuit (from last iteration)
+    fig = circuit_drawer(full_circuit, output='mpl', scale=0.7, fold=30)
+    plt.tight_layout()
+    fig.savefig('qpa_circuit.pdf')
+    print("[+] Saved QPA circuit plot as qpa_circuit.pdf")
+
 if __name__ == '__main__':
     main()

@@ -1,0 +1,60 @@
+import os
+import numpy as np
+from qiskit_ibm_runtime import QiskitRuntimeService
+
+JOB_ID = "d6cca0154hss73b8dfag"
+
+def load_token():
+    try:
+        from dotenv import load_dotenv
+        here = os.path.dirname(os.path.abspath(__file__))
+        load_dotenv(os.path.join(here, ".env"))
+    except Exception:
+        pass
+    token = os.getenv("IBM_QUANTUM_TOKEN") or os.getenv("IBM_API")
+    if not token:
+        raise RuntimeError("Set IBM_QUANTUM_TOKEN (or IBM_API) in env or .env")
+    return token
+
+token = load_token()
+service = QiskitRuntimeService(channel="ibm_quantum_platform", token=token)
+
+job = service.job(JOB_ID)
+print("backend:", job.backend().name)
+print("status:", job.status())
+
+res = job.result()
+item0 = list(res)[0]
+
+print("\nitem0 keys:")
+for k, v in item0.items():
+    try:
+        a = np.asarray(v)
+        print(f"  {k:25s} dtype={a.dtype} shape={a.shape}")
+    except Exception:
+        print(f"  {k:25s} type={type(v)}")
+
+raw = np.asarray(item0["c"]).reshape(-1)   # bool array
+
+# IMPORTANT: this backend/result format is giving True=0, False=1
+bits = (~raw).astype(np.int8)
+
+N = bits.size
+n1 = int(bits.sum())
+n0 = N - n1
+p1 = n1 / N
+
+print("\nraw bool counts:")
+print("  True :", int(raw.sum()))
+print("  False:", int((~raw).sum()))
+
+print("\ndecoded bit counts (True->0, False->1):")
+print("  N:", N)
+print("  counts:", {"0": n0, "1": n1})
+print("  p(1):", round(p1, 6))
+
+# If you are using Convention A: p(1)=lambda/2 ideally (for |0> then Pauli then Z-meas)
+lam_hat = 2.0 * p1
+print("  lambda_hat (Convention A, ideal model):", round(lam_hat, 6))
+
+print("\nfirst 40 decoded bits:", bits[:40].tolist())

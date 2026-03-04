@@ -1,176 +1,131 @@
-# QPA-Experiments: Quantum Purity Amplification
+# QPA Cyclic Project - Modular Architecture
 
-**QPA-Experiments** is a simulation framework for studying Quantum Purity Amplification (QPA), a protocol that amplifies the purity of noisy quantum states through iterative entanglement, measurement, and conditional operations. This project enables benchmarking QPA performance across a wide range of noise models and protocol parameters, with support for Trotterized Ising evolution and the SWAPNET architecture. Simulations are optimized for near-term quantum hardware and hybrid analog-digital platforms.
+## Overview
+This project implements the Quantum Purification Algorithm (QPA) using a cyclic method. It provides a modular framework for simulations on:
+- **Qiskit AER Simulators**: Using dynamic circuits (`if_test`) and ideal noise models.
+- **IBM Fake Backends**: Using static unrolled circuits and Pauli twirling.
+- **IBM Real Hardware**: Using static unrolled circuits and Pauli twirling.
 
----
+## Directory Structure
+```
+cyclic_project/
+├── core/
+│   ├── strategies/             # Circuit generation strategies
+│   │   ├── base.py             # Base strategy class
+│   │   ├── dynamic.py          # Dynamic circuit strategy (if_test)
+│   │   └── unrolled.py         # Unrolled circuit strategy (static paths)
+│   ├── circuit_factory.py      # Factory for creating strategies
+│   ├── registers.py            # Quantum/Classical register management
+│   ├── noise_models.py         # Noise injection strategies (Depolarizing vs Twirling)
+│   └── ops.py                  # Quantum operations (gates, measurements)
+├── execution/
+│   ├── runner.py               # Main execution engine
+│   ├── job_service.py          # Job submission and tracking service
+│   ├── backend_handler.py      # Wrappers for AER, Fake, and IBM Runtime backends
+│   └── transpiler_service.py   # Transpilation logic
+├── analysis/
+│   ├── result_processor.py     # Results extraction and aggregation
+│   └── fidelity_calc.py        # Fidelity computation logic
+├── data/
+│   ├── jobs/                   # Job history and results storage
+│   ├── logs/                   # Execution logs
+│   └── results/                # Aggregated CSV results
+├── scripts/
+│   ├── batch_job.slurm         # SLURM submission script with examples
+│   └── plot_results.py         # Plotting tool
+├── utils/
+│   ├── config.py               # Configuration management
+│   └── paths.py                # Path management
+├── main.py                     # CLI Entry Point
+├── retrieve_results.py         # Job retrieval and processing tool
+└── requirements.txt            # Python dependencies
+```
 
-## 🛠️ Conda Environment Setup
+## Data Organization
+Jobs are organized hierarchically to facilitate efficient retrieval and management.
 
-You can set up your environment directly using the `environment.yml` file provided in the repository:
+**Standard Runs:**
+```
+data/jobs/<backend>/<device>/n<N>_k<K>_t<Trials>/p<Points>/s<Shots>_c<Random>/<timestamp>/
+```
 
+**No-Reset Runs:**
+```
+data/jobs/<backend>/<device>/no_reset/n<N>_k<K>_t<Trials>/p<Points>/s<Shots>_c<Random>/<timestamp>/
+```
+
+## Installation
+
+1.  **Environment Setup**:
+    ```bash
+    conda create -n qpa_env python=3.10
+    conda activate qpa_env
+    pip install -r requirements.txt
+    ```
+
+2.  **Configuration**:
+    Create a `.env` file in the root directory (or rename `.env.example` if available) and add your IBM Quantum credentials:
+    ```ini
+    IBM_QUANTUM_TOKEN=your_token_here
+    CRN=your_crn_here
+    ```
+
+## Usage
+
+### 1. Run on AER (Dynamic Simulation)
+Fast simulation using Qiskit Aer's dynamic circuit capabilities.
 ```bash
-conda env create -f environment.yml
-conda activate qpa_env
+python main.py --backend aer --method dynamic --n 5 --k 2 --trials 3 --points 25 --shots 1000 --output results_aer.csv
 ```
 
-### Jupyter Notebook Support
-If you're working with Jupyter notebooks:
-
+### 2. Run on Fake Backend (Unrolled Simulation)
+Simulates hardware constraints (no dynamic control) using unrolled circuits and Pauli Twirling noise.
 ```bash
-conda install jupyter notebook
+python main.py --backend fake --device ibm_brisbane --n 5 --k 2 --trials 3 --points 25 --shots 1000 --n-random 10 --output results_fake.csv
 ```
 
-To use the QPA environment as a Jupyter kernel:
+### 3. Run with No-Reset (Experimental)
+Run simulation without resetting ancilla qubits (uses fresh ancillas for each step). This mimics hardware where reset is costly or unavailable.
 ```bash
-python -m ipykernel install --user --name=qpa_env --display-name "QPA Env"
-jupyter notebook
+python main.py --backend aer --method unrolled --n 5 --k 2 --trials 3 --no-reset --output results_no_reset.csv
 ```
 
----
-
-## 🔐 IBM Quantum Token Setup
-
-If you're using IBM Quantum services, create a `.env` file in the project root with:
-```env
-IBM_QUANTUM_TOKEN=your_ibmq_token_here
-```
-
----
-
-## ⚡ GPU-Accelerated Qiskit Aer on SubMIT
-
-Install the GPU-enabled Qiskit Aer backend:
+### 4. Run on Real Hardware (Submit Only)
+Submits jobs to IBM Quantum in "Post-Only" mode (returns immediately).
 ```bash
-pip install qiskit-aer-cu11
+python main.py --backend ibm --device ibm_brisbane --n 5 --k 2 --trials 3 --points 25 --shots 4000 --n-random 100 --batch-size 200 --post-only --output results_ibm_submit.csv
 ```
 
-Then request a GPU node:
+### 5. Retrieve Results
+Retrieves results from IBM or previously saved local simulations.
 ```bash
-salloc --partition=submit-gpu-a30 --cpus-per-gpu=1 --gres=gpu:1 --mem=8G --time=01:00:00
+# Standard retrieval
+python retrieve_results.py --backend ibm --device ibm_brisbane --n 5 --k 2 --trials 3 --output results_ibm.csv
+
+# Retrieve No-Reset jobs
+python retrieve_results.py --backend aer --device aer_unrolled --n 5 --k 2 --trials 3 --no-reset --output results_no_reset.csv
 ```
 
-Set up CUDA manually on the node:
+### 6. Plot Results
+Visualizes the fidelity decay curves with error bars and theoretical comparisons.
 ```bash
-export CUDA_ROOT=/usr/local/cuda
-export PATH=$CUDA_ROOT/bin:$PATH
-export LD_LIBRARY_PATH=$CUDA_ROOT/lib64:$LD_LIBRARY_PATH
+python scripts/plot_results.py results_ibm.csv results_no_reset.csv --output plot.png
 ```
 
-Check it works:
-```bash
-nvcc --version
-python -c "from qiskit_aer import AerSimulator; print(AerSimulator().available_devices())"
-```
-Expected output:
-```
-('CPU', 'GPU')
-```
+## SLURM (Batch Execution)
+For large-scale simulations on a cluster, use the provided SLURM script. It contains pre-configured examples for all workflows.
 
----
+1.  **Edit the script**: Uncomment the desired example command and its corresponding `#SBATCH --job-name`.
+2.  **Submit**:
+    ```bash
+    cd scripts
+    sbatch batch_job.slurm
+    ```
+    This runs unbuffered (`python -u`) to ensure real-time logging in `data/logs/`.
 
-## 🧪 Running Batch Simulations
-
-To launch a full batch of QPA simulations across different numbers of QPA rounds (`nqpa`) and Trotter steps (`ntrot`), simply run the script below. You can modify the parameters (such as `nqpa`, `ntrot`, `k`, `shots`, and epsilon sweep settings) directly in the `submit_all.sh` file:
-
-```bash
-bash submit_all.sh
-```
-
-This script submits SLURM job arrays that sweep over different values of depolarizing noise strength (`ε`). Each job in the array corresponds to a different `ε` value.
-
-### 🔍 Where to find outputs and logs
-- **Simulation output CSVs** are saved in:
-  ```
-  "data/estimation_<JOBID>_k<K>_shots<SHOTS>_eps<MIN>-<MAX>_s<STEPS>/"
-  ```
-- **Log files** are saved in:
-  ```
-  "logs/estimation_<JOBID>_k<K>_shots<SHOTS>_eps<MIN>-<MAX>_s<STEPS>/"
-  ```
-  Each file is named by QPA round, Trotter step count, and epsilon index. For example:
-  ```
-  "nqpa2_ntrot5_eps17.csv"
-  "nqpa2_ntrot5_eps17.out"
-  "nqpa2_ntrot5_eps17.err"
-  ```
-
-These directories are automatically created for each batch job submission.
-
----
-
-## 📁 Project Directory Overview
-
-```bash
-OQPA/
-├── README.md                    # Project documentation
-├── .env                         # Local IBM token (not committed)
-├── .gitignore                   # Ignore cache, logs, env files, etc.
-│ 
-├── reqs/
-│   └── environment.yml          # Conda environment definition
-│ 
-├── clean.py                     # Aggregates and postprocesses simulation outputs
-├── combine_data.py              # Aggregates estimation outputs
-│
-├── aer_global_simulation_scripts/  # AER-based simulator scripts for global noise model + QPA
-│   └── aer_simulation.py        # Main simulation script for QPA with global noise model
-│
-├── aer_trotter_estimation_scripts/ # Digital state preparation + QPA experiment
-│   └── aer_estimation.py        # Main estimation script for Trotterized evolution
-│ 
-├── aer_ryd_estimation_scripts/  # Rydberg state preparation + QPA experiment
-│   ├── ryd_sim_scripts/         # Rydberg simulation scripts
-│   │    ├── run_ryd_sim.slurm   # Submit batch job for Rydberg simulations
-│   │    └── ryd_sim.py          # Rydberg simulation implementation
-│   └── custom_state_estimation.py # QPA estimation on extracted Rydberg eigenstates
-│
-├── full_dm_simulation/          # Full density matrix simulation implementation
-│   └── circuit_based_full_dm.ipynb  # Jupyter notebook for full density matrix circuit simulation
-│
-├── ibm_global_sampler_scripts/  # IBM Quantum experiments with global noise model
-│   └── three_circuits_ibm_global_sampler.py  # Implementation of QPA with three circuits on IBMQ
-│
-├── batching_engaging/           # Batching scripts for engagement cluster (e.g., SubMIT)
-│   ├── estimate.sh             # Shell script for aer_estimation jobs
-│   ├── estimate.slurm          # SLURM script for aer_estimation jobs
-│   └── other SLURM and shell scripts for various experiments
-│ 
-├── batching_submit/             # Batching scripts for submission cluster (e.g., HPC)
-│   ├── estimate.sh             # Shell script for estimation jobs
-│   ├── estimate.slurm          # SLURM script for estimation jobs
-│   └── other SLURM and shell scripts for HPC submission
-│ 
-├── data/                        # Intermediate simulation results
-├── logs/                        # SLURM stdout/stderr outputs
-├── shared_data/                 # Final results and processed data
-│   ├── aer_global_simulation/   # Results from global noise model simulations
-│   ├── aer_trotter_estimation/  # Results from Trotterized evolution experiments
-│   ├── aer_ryd_estimation/      # Results from Rydberg state experiments
-│   ├── three_circuits_ibm_global_sampler/      # Results from IBM Quantum experiments
-│   ├── unitary_evolved_full_dm/ # Results from full density matrix simulations
-│   ├── main_plotting.ipynb       # Notebook used to generate the main figures
-│   └── SI_plotting.ipynb        # Notebook used to generate the supplementary figures
-├── writeup/                     # Documentation and summaries
-└── QCT_codes/                   # Quantum Character Transformation related code
-```
-
-## 🔄 Batching System Overview
-
-The batching system is designed to handle distributed computing across different computational clusters. It consists of two main components:
-
-### Batching Engaging (`batching_engaging/`)
-This directory contains SLURM scripts and shell scripts designed for the engagement cluster (typically SubMIT). These scripts are optimized for:
-- Shorter runtime jobs
-- Quick turnaround for iterative development
-- Testing new features and algorithms
-- Fidelity comparisons and small-scale simulations
-
-### Batching Submit (`batching_submit/`)
-This directory contains scripts designed for large-scale HPC cluster submissions. These scripts are optimized for:
-- Large-scale batch simulations
-- Long-running jobs
-- Production runs with many parameter sweeps
-- Resource-intensive computations
-
-Each type of simulation (fake backend, Rydberg, ladder step initialization) has corresponding scripts in both directories to handle different computational requirements and cluster configurations.
-
+## Methodology
+- **Dynamic Method**: Uses a single circuit with `if_test` instructions to implement the probabilistic success/failure logic of QPA.
+- **Unrolled Method**: Pre-calculates all possible execution paths (success/failure branches) and generates a set of static circuits. During analysis, shots are filtered based on ancilla measurements to mimic the conditional logic.
+- **Parameterized Method**: Uses Qiskit's `Parameter` objects to create a single circuit template with placeholders for Pauli Twirling gates (`RX`, `RZ`). This significantly reduces transpilation time and memory usage by submitting a single circuit with multiple parameter bindings (PUBs).
+- **Pauli Twirling**: For hardware/fake execution, coherent noise is converted into stochastic Pauli noise by averaging over multiple circuit instances with random Pauli gates inserted.
+- **No-Reset Optimization**: Optionally disables qubit reset instructions, allocating new ancilla qubits for each trial step. This increases qubit count but avoids potential reset errors on hardware.

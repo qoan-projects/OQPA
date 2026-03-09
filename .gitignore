@@ -7,3 +7,4 @@ __pycache__
 .vscode/
 data
 .env
+aer_trotter_data

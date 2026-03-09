@@ -154,8 +154,18 @@ def main():
             projector_op = SparsePauliOp.from_operator(exact_state.to_operator())
 
             # Build QPA strategy and circuit for this epsilon
-            circuits_data = strategy.build(eps)
-            qpa_circuit = circuits_data[0]['circuit'] if circuits_data else None
+            if args.n == 1:
+                # Special case for Unamplified (n=1): Simple Ising simulation
+                # Create a circuit with 1 register and readout
+                from qiskit import QuantumRegister, ClassicalRegister
+                qr = QuantumRegister(args.k, "R1")
+                cr = ClassicalRegister(args.k, "readout")
+                qpa_circuit = QuantumCircuit(qr, cr)
+                # No QPA logic, just measure at the end
+                qpa_circuit.measure(qr, cr)
+            else:
+                circuits_data = strategy.build(eps)
+                qpa_circuit = circuits_data[0]['circuit'] if circuits_data else None
 
             # prepend Ising to every data register
             full_circuit = qpa_circuit.copy()
@@ -243,42 +253,66 @@ def main():
         s = str(v)
         return s.replace('.', 'p')
 
-    base_out = args.output
-    if base_out.endswith('.csv'):
-        base_root = base_out[:-4]
+    # Construct hierarchical output path
+    # {OUTDIR}/t{t}_J{J}_h{h}/k{k}/n{n}/trials{trials}/shots{shots}/
+    base_dir = args.output
+    
+    if args.n == 1:
+        # Special case for Unamplified (n=1)
+        # We ignore trials for folder structure as it's just Ising
+        subfolder = f"t{fmt(args.t)}_J{fmt(args.J)}_h{fmt(args.h)}/k{args.k}/unamplified/shots{args.shots}"
     else:
-        base_root = base_out
+        subfolder = f"t{fmt(args.t)}_J{fmt(args.J)}_h{fmt(args.h)}/k{args.k}/n{args.n}/trials{args.trials}/shots{args.shots}"
+        
+    out_dir = os.path.join(base_dir, subfolder)
+    os.makedirs(out_dir, exist_ok=True)
 
     if mode == 'steps':
-        # metadata: include fixed epsilon in filename
+        # Steps sweep (single epsilon)
         eps_fixed = epsilons[0]
-        meta_parts = [f"k{fmt(args.k)}", f"n{fmt(args.n)}", f"trials{fmt(args.trials)}", f"epsilon{fmt(eps_fixed)}"]
-        out_path = f"{base_root}_stepsSweep_{'_'.join(str(s) for s in steps_vals)}_{'_'.join(meta_parts)}.csv"
-        out_dir = os.path.dirname(out_path) or 'data'
-        os.makedirs(out_dir, exist_ok=True)
+        filename = f"result_eps{fmt(eps_fixed)}_stepsSweep_{'_'.join(str(s) for s in steps_vals)}.csv"
+        plot_filename = f"circuit_eps{fmt(eps_fixed)}_stepsSweep_{'_'.join(str(s) for s in steps_vals)}.pdf"
+        
+        out_path = os.path.join(out_dir, filename)
+        plot_path = os.path.join(out_dir, plot_filename)
+        
         df_steps = pd.DataFrame({'steps': steps_vals, 'fidelity': fidelities_steps})
         df_steps.to_csv(out_path, index=False)
         print(f'[+] Steps-sweep CSV saved to {out_path}')
+        
     else:
-        # epsilon sweep CSV
-        meta_keys = ['k', 'n', 'trials', 'steps', 't', 'J', 'h', 'method', 'noise', 'shots', 'epsilon_max']
-        meta_parts = []
-        for key in meta_keys:
-            val = getattr(args, key)
-            meta_parts.append(f"{key}{fmt(val)}")
-        meta_suffix = '_'.join(meta_parts)
-        out_path = f"{base_root}_{meta_suffix}.csv"
-        out_dir = os.path.dirname(out_path) or 'data'
-        os.makedirs(out_dir, exist_ok=True)
+        # Epsilon sweep (single steps)
+        steps_fixed = steps_vals[0]
+        # result_epsSweep_steps{steps}.csv ? 
+        # User requested: result_eps{val}_steps{val}.csv 
+        # But here we have a sweep of epsilons.
+        # If this is run from SLURM array with single epsilon (epsilon_min=epsilon_max), then epsilons has 1 value.
+        
+        if len(epsilons) == 1:
+            # Single point run (likely from SLURM array)
+            eps_val = epsilons[0]
+            filename = f"result_eps{fmt(eps_val)}_steps{fmt(steps_fixed)}.csv"
+            plot_filename = f"circuit_eps{fmt(eps_val)}_steps{fmt(steps_fixed)}.pdf"
+        else:
+            # Full sweep run locally
+            filename = f"result_epsSweep_steps{fmt(steps_fixed)}.csv"
+            plot_filename = f"circuit_epsSweep_steps{fmt(steps_fixed)}.pdf"
+            
+        out_path = os.path.join(out_dir, filename)
+        plot_path = os.path.join(out_dir, plot_filename)
+        
         df = pd.DataFrame({'epsilon': list(epsilons), 'fidelity': fidelities})
         df.to_csv(out_path, index=False)
-        print(f'[+] Simple CSV saved to {out_path}')
+        print(f'[+] CSV saved to {out_path}')
 
     # Plot / save the final full_circuit (from last iteration)
-    fig = circuit_drawer(full_circuit, output='mpl', scale=0.7, fold=30)
-    plt.tight_layout()
-    fig.savefig('qpa_circuit.pdf')
-    print("[+] Saved QPA circuit plot as qpa_circuit.pdf")
+    try:
+        fig = circuit_drawer(full_circuit, output='mpl', scale=0.7, fold=30)
+        plt.tight_layout()
+        fig.savefig(plot_path)
+        print(f"[+] Saved QPA circuit plot as {plot_path}")
+    except Exception as e:
+        print(f"[-] Could not save circuit plot: {e}")
 
 if __name__ == '__main__':
     main()

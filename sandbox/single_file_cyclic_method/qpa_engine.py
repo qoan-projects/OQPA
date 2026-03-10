@@ -3,6 +3,7 @@ import os
 import argparse
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from itertools import product
 from concurrent.futures import ProcessPoolExecutor
 from abc import ABC, abstractmethod
@@ -215,6 +216,24 @@ def main():
 
     print(f"--- Starting Simulation: N={args.n}, k={args.k}, Workers={args.workers} ---")
     
+    # Save a copy of the circuit
+    try:
+        print("Generating sample circuit diagram...")
+        # Use a small non-zero lambda to potentially show noise operations if visualized
+        strategy_viz = HybridNRegStrategy(args.k, args.trials, n_registers=args.n)
+        qc_viz = strategy_viz.build_circuit(0.1)
+        
+        output_dir = f"results_hybrid_scaling/k{args.k}_ntrials{args.trials}/"
+        os.makedirs(output_dir, exist_ok=True)
+        circuit_filename = os.path.join(output_dir, f"circuit_n{args.n}.pdf")
+        
+        # Draw and save
+        # output='mpl' requires matplotlib. 'latex' requires latex.
+        qc_viz.draw(output='mpl', filename=circuit_filename)
+        print(f"[+] Saved circuit diagram to {circuit_filename}")
+    except Exception as e:
+        print(f"[-] Could not save circuit diagram: {e}")
+
     lambdas = np.linspace(0.0, 1.0, args.points)
     
     # Prepare arguments for parallel execution
@@ -230,7 +249,7 @@ def main():
             
     # Save Results
     df = pd.DataFrame(results, columns=['lambda', f'fidelity_n{args.n}'])
-    output_dir = "results_hybrid_scaling"
+    output_dir = f"results_hybrid_scaling/k{args.k}_ntrials{args.trials}/"
     os.makedirs(output_dir, exist_ok=True)
     output_file = os.path.join(output_dir, f"data_n{args.n}.csv")
     

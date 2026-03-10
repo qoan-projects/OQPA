@@ -1,0 +1,31 @@
+Running QPA Simulation for N=3 on node1616
+--- Starting Simulation: N=3, k=1, Workers=40 ---
+Generating sample circuit diagram...
+[+] Saved circuit diagram to results_hybrid_scaling/k1_ntrials4/circuit_n3.pdf
+   [N=3] Lambda=0.00 -> Fidelity=1.0000
+   [N=3] Lambda=0.04 -> Fidelity=0.9917
+   [N=3] Lambda=0.08 -> Fidelity=0.9827
+   [N=3] Lambda=0.12 -> Fidelity=0.9707
+   [N=3] Lambda=0.17 -> Fidelity=0.9582
+   [N=3] Lambda=0.21 -> Fidelity=0.9442
+   [N=3] Lambda=0.25 -> Fidelity=0.9286
+   [N=3] Lambda=0.29 -> Fidelity=0.9133
+   [N=3] Lambda=0.33 -> Fidelity=0.8964
+   [N=3] Lambda=0.38 -> Fidelity=0.8761
+   [N=3] Lambda=0.42 -> Fidelity=0.8555
+   [N=3] Lambda=0.46 -> Fidelity=0.8350
+   [N=3] Lambda=0.50 -> Fidelity=0.8110
+   [N=3] Lambda=0.54 -> Fidelity=0.7899
+   [N=3] Lambda=0.58 -> Fidelity=0.7631
+   [N=3] Lambda=0.62 -> Fidelity=0.7399
+   [N=3] Lambda=0.67 -> Fidelity=0.7171
+   [N=3] Lambda=0.71 -> Fidelity=0.6905
+   [N=3] Lambda=0.75 -> Fidelity=0.6625
+   [N=3] Lambda=0.79 -> Fidelity=0.6371
+   [N=3] Lambda=0.83 -> Fidelity=0.6099
+   [N=3] Lambda=0.88 -> Fidelity=0.5826
+   [N=3] Lambda=0.92 -> Fidelity=0.5550
+   [N=3] Lambda=0.96 -> Fidelity=0.5302
+   [N=3] Lambda=1.00 -> Fidelity=0.4988
+[+] Saved results to results_hybrid_scaling/k1_ntrials4/data_n3.csv
+Finished N=3

@@ -4,10 +4,10 @@
 #SBATCH --error=aer_trotter_data/logs/%x_%A_%a.err
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=20
 #SBATCH --time=12:00:00
 #SBATCH --partition=mit_normal
-#SBATCH --array=0-109  # 11 epsilons * 10 steps = 110 jobs
+#SBATCH --array=0-10  # 11 epsilons * 1 steps = 110 jobs
 
 # Load modules and environment
 source ~/.bashrc
@@ -25,7 +25,8 @@ echo "Date: $(date)"
 EPSILONS=(0.0 0.0005 0.001 0.0015 0.002 0.0025 0.003 0.0035 0.004 0.0045 0.005)
 
 # Steps: 2 to 20 step 2 (10 values)
-STEPS_LIST=(2 4 6 8 10 12 14 16 18 20)
+# STEPS_LIST=(2 4 6 8 10 12 14 16 18 20)
+STEPS_LIST=(18)
 
 # Calculate indices for 2D grid sweep
 NUM_STEPS=${#STEPS_LIST[@]}
@@ -61,9 +62,9 @@ python3 -u $SCRIPT_PATH \
     --steps $STEPS \
     --output $OUT_DIR \
     --k 2 \
-    --n 1 \
-    --trials 1 \
-    --shots 50000 \
+    --n 7 \
+    --trials 4 \
+    --shots 100000 \
     --t 1.0 \
     --J 1.0 \
     --h 1.0 \

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=aer_est_sweep
+#SBATCH --job-name=zoomed_aer_est_sweep
 #SBATCH --output=aer_trotter_data/logs/%x_%A_%a.out
 #SBATCH --error=aer_trotter_data/logs/%x_%A_%a.err
 #SBATCH --nodes=1
@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=20
 #SBATCH --time=12:00:00
 #SBATCH --partition=mit_normal
-#SBATCH --array=0-10  # 11 epsilons * 1 steps = 110 jobs
+#SBATCH --array=0-10  # 11 epsilons * 1 steps = 11 jobs
 
 # Load modules and environment
 source ~/.bashrc
@@ -21,10 +21,10 @@ echo "Starting AER Estimation Job Array Task $SLURM_ARRAY_TASK_ID on $(hostname)
 echo "Date: $(date)"
 
 # Define Parameter Arrays
-# Epsilon: 0 to 0.005 step 0.0005 (11 values)
-EPSILONS=(0.0 0.0005 0.001 0.0015 0.002 0.0025 0.003 0.0035 0.004 0.0045 0.005)
+# Epsilon: 0 to 0.001 step 0.0001 (11 values)
+EPSILONS=(0.0 0.0001 0.0002 0.0003 0.0004 0.0005 0.0006 0.0007 0.0008 0.0009 0.001)
 
-# Steps: 2 to 20 step 2 (10 values)
+# # Steps: 2 to 20 step 2 (10 values)
 # STEPS_LIST=(2 4 6 8 10 12 14 16 18 20)
 STEPS_LIST=(18)
 
@@ -50,7 +50,7 @@ STEPS=${STEPS_LIST[$STEPS_IDX]}
 echo "Running with Parameters: Epsilon=$EPS, Steps=$STEPS"
 
 # Define Output Directory
-OUT_DIR="aer_trotter_data/results"
+OUT_DIR="aer_trotter_data/zoomed_results"
 # Ensure the base results directory exists; the python script will create subdirectories
 mkdir -p $OUT_DIR
 

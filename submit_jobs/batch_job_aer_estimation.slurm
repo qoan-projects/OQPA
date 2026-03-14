@@ -62,8 +62,8 @@ python3 -u $SCRIPT_PATH \
     --steps $STEPS \
     --output $OUT_DIR \
     --k 2 \
-    --n 7 \
-    --trials 4 \
+    --n 1 \
+    --trials 1 \
     --shots 100000 \
     --t 1.0 \
     --J 1.0 \

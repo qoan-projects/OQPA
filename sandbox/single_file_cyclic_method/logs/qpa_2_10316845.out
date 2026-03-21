@@ -1,0 +1,31 @@
+Running QPA Simulation for N=7 on node1616
+--- Starting Simulation: N=7, k=2, Workers=20 ---
+Generating sample circuit diagram...
+[+] Saved circuit diagram to results_hybrid_scaling/k2_ntrials4/circuit_n7.pdf
+   [N=7] Lambda=0.00 -> Fidelity=1.0000
+   [N=7] Lambda=0.04 -> Fidelity=0.9941
+   [N=7] Lambda=0.08 -> Fidelity=0.9874
+   [N=7] Lambda=0.12 -> Fidelity=0.9782
+   [N=7] Lambda=0.17 -> Fidelity=0.9679
+   [N=7] Lambda=0.21 -> Fidelity=0.9546
+   [N=7] Lambda=0.25 -> Fidelity=0.9389
+   [N=7] Lambda=0.29 -> Fidelity=0.9202
+   [N=7] Lambda=0.33 -> Fidelity=0.8965
+   [N=7] Lambda=0.38 -> Fidelity=0.8729
+   [N=7] Lambda=0.42 -> Fidelity=0.8433
+   [N=7] Lambda=0.46 -> Fidelity=0.8115
+   [N=7] Lambda=0.50 -> Fidelity=0.7761
+   [N=7] Lambda=0.54 -> Fidelity=0.7407
+   [N=7] Lambda=0.58 -> Fidelity=0.6970
+   [N=7] Lambda=0.62 -> Fidelity=0.6637
+   [N=7] Lambda=0.67 -> Fidelity=0.6158
+   [N=7] Lambda=0.71 -> Fidelity=0.5683
+   [N=7] Lambda=0.75 -> Fidelity=0.5244
+   [N=7] Lambda=0.79 -> Fidelity=0.4790
+   [N=7] Lambda=0.83 -> Fidelity=0.4279
+   [N=7] Lambda=0.88 -> Fidelity=0.3848
+   [N=7] Lambda=0.92 -> Fidelity=0.3356
+   [N=7] Lambda=0.96 -> Fidelity=0.2932
+   [N=7] Lambda=1.00 -> Fidelity=0.2488
+[+] Saved results to results_hybrid_scaling/k2_ntrials4/data_n7.csv
+Finished N=7

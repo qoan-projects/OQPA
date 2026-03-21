@@ -1,0 +1,31 @@
+Running QPA Simulation for N=5 on node3111
+--- Starting Simulation: N=5, k=2, Workers=40 ---
+Generating sample circuit diagram...
+[+] Saved circuit diagram to results_hybrid_scaling/k2_ntrials3/circuit_n5.pdf
+   [N=5] Lambda=0.00 -> Fidelity=1.0000
+   [N=5] Lambda=0.04 -> Fidelity=0.9922
+   [N=5] Lambda=0.08 -> Fidelity=0.9815
+   [N=5] Lambda=0.12 -> Fidelity=0.9696
+   [N=5] Lambda=0.17 -> Fidelity=0.9543
+   [N=5] Lambda=0.21 -> Fidelity=0.9361
+   [N=5] Lambda=0.25 -> Fidelity=0.9135
+   [N=5] Lambda=0.29 -> Fidelity=0.8901
+   [N=5] Lambda=0.33 -> Fidelity=0.8644
+   [N=5] Lambda=0.38 -> Fidelity=0.8368
+   [N=5] Lambda=0.42 -> Fidelity=0.8078
+   [N=5] Lambda=0.46 -> Fidelity=0.7725
+   [N=5] Lambda=0.50 -> Fidelity=0.7384
+   [N=5] Lambda=0.54 -> Fidelity=0.7017
+   [N=5] Lambda=0.58 -> Fidelity=0.6646
+   [N=5] Lambda=0.62 -> Fidelity=0.6248
+   [N=5] Lambda=0.67 -> Fidelity=0.5798
+   [N=5] Lambda=0.71 -> Fidelity=0.5436
+   [N=5] Lambda=0.75 -> Fidelity=0.4970
+   [N=5] Lambda=0.79 -> Fidelity=0.4579
+   [N=5] Lambda=0.83 -> Fidelity=0.4146
+   [N=5] Lambda=0.88 -> Fidelity=0.3710
+   [N=5] Lambda=0.92 -> Fidelity=0.3309
+   [N=5] Lambda=0.96 -> Fidelity=0.2883
+   [N=5] Lambda=1.00 -> Fidelity=0.2485
+[+] Saved results to results_hybrid_scaling/data_n5.csv
+Finished N=5

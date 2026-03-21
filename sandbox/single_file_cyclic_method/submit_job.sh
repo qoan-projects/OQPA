@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=qpa_scaling
-#SBATCH --array=4-6
+#SBATCH --array=0-2
 #SBATCH --partition=mit_normal
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=40
 #SBATCH --mem=256G
 #SBATCH --time=08:59:59
-#SBATCH --output=logs/qpa_%a.out
+#SBATCH --output=logs/qpa_%a_%j.out
 #SBATCH --error=logs/qpa_%a.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=caiosiq@mit.edu
@@ -20,8 +20,8 @@
 # NS=(3 5 7 9)
 
 
-NS=(3 5 7 9 11 13 15)
-NWORKERS=(40 40 40 20 1 1 1)
+NS=(3 5 7)
+NWORKERS=(40 40 20)
 CURRENT_N=${NS[$SLURM_ARRAY_TASK_ID]}
 CURRENT_NWORKERS=${NWORKERS[$SLURM_ARRAY_TASK_ID]}
 echo "Running QPA Simulation for N=$CURRENT_N on $(hostname)"
@@ -40,7 +40,7 @@ python qpa_engine.py \
     --n $CURRENT_N \
     --k 1 \
     --trials 4 \
-    --shots 400000 \
+    --shots 100000 \
     --points 25 \
     --workers $CURRENT_NWORKERS
 
